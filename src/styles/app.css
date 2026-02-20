@@ -1,0 +1,151 @@
+:root {
+  font-family: 'Avenir Next', 'Segoe UI', sans-serif;
+  color: #102a43;
+  background: radial-gradient(circle at top, #e8f5e9 0%, #f8fafc 45%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+}
+
+.app-header h1 {
+  margin: 0.25rem 0;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0b6e4f;
+}
+
+.subhead {
+  margin-top: 0;
+  color: #486581;
+}
+
+.upload-zone {
+  border: 2px dashed #0b6e4f;
+  background: #ffffffcc;
+  border-radius: 14px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.upload-zone.dragging {
+  border-color: #1f8a70;
+  background: #dff6ef;
+}
+
+.upload-zone button {
+  background: #0b6e4f;
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+}
+
+.upload-zone button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.controls {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.status,
+.error {
+  margin-top: 0.8rem;
+}
+
+.error {
+  color: #b00020;
+  font-weight: 600;
+}
+
+.warning-box {
+  margin-top: 1rem;
+  background: #fff5d6;
+  border-left: 4px solid #f4a100;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+}
+
+.kpis {
+  margin-top: 1.2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.8rem;
+}
+
+.kpi-card,
+.chart-card,
+.table-card {
+  background: #ffffffde;
+  border-radius: 12px;
+  padding: 0.9rem;
+  box-shadow: 0 2px 18px rgba(16, 42, 67, 0.08);
+}
+
+.kpi-card h3,
+.chart-card h3,
+.table-card h3 {
+  margin-top: 0;
+}
+
+.kpi-card p {
+  margin-bottom: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.charts-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.8rem;
+}
+
+.table-card {
+  margin-top: 0.8rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid #d9e2ec;
+  text-align: left;
+  padding: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .upload-zone {
+    padding: 1.3rem;
+  }
+}

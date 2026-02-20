@@ -1,0 +1,85 @@
+import { useState } from 'react';
+import Dashboard from './components/Dashboard';
+import UploadZone from './components/UploadZone';
+import { parseTuroCsv } from './lib/csv';
+import { buildDashboardData } from './lib/metrics';
+import { saveUploadToSupabase, supabase } from './lib/supabase';
+import type { DashboardData } from './lib/types';
+
+export default function App() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [saveToSupabase, setSaveToSupabase] = useState(false);
+  const [lastFileName, setLastFileName] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setError(null);
+    setWarnings([]);
+    setIsLoading(true);
+
+    try {
+      const parsed = await parseTuroCsv(file);
+      const dashboard = buildDashboardData(parsed.records);
+      setData(dashboard);
+      setWarnings(parsed.warnings);
+      setLastFileName(file.name);
+
+      if (saveToSupabase) {
+        await saveUploadToSupabase(file.name, parsed.records, dashboard);
+      }
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : 'Unknown upload error';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <p className="eyebrow">Turo Codex</p>
+        <h1>CSV to Business Insights</h1>
+        <p className="subhead">Upload raw Turo export data and get KPI + trend insights immediately.</p>
+      </header>
+
+      <UploadZone onFileSelected={handleFile} isLoading={isLoading} />
+
+      <section className="controls">
+        <label>
+          <input
+            type="checkbox"
+            checked={saveToSupabase}
+            onChange={(event) => setSaveToSupabase(event.target.checked)}
+          />
+          Save this upload to Supabase
+        </label>
+        <small>
+          {supabase
+            ? 'Supabase is configured from environment variables.'
+            : 'Supabase not configured yet. Local dashboard mode still works.'}
+        </small>
+      </section>
+
+      {lastFileName ? <p className="status">Latest file: {lastFileName}</p> : null}
+
+      {error ? <p className="error">{error}</p> : null}
+
+      {warnings.length > 0 ? (
+        <section className="warning-box">
+          <h2>Rows Skipped</h2>
+          <ul>
+            {warnings.slice(0, 10).map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+          {warnings.length > 10 ? <p>+{warnings.length - 10} more</p> : null}
+        </section>
+      ) : null}
+
+      {data ? <Dashboard data={data} /> : null}
+    </main>
+  );
+}
