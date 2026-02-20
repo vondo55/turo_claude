@@ -9,6 +9,19 @@ const supabaseClientKey = supabasePublishableKey ?? supabaseAnonKey;
 export const supabase =
   supabaseUrl && supabaseClientKey ? createClient(supabaseUrl, supabaseClientKey) : null;
 
+type SupabaseErrorLike = {
+  message?: string;
+  details?: string;
+  hint?: string;
+  code?: string;
+};
+
+function formatSupabaseError(error: SupabaseErrorLike, fallback: string) {
+  const parts = [error.message, error.details, error.hint].filter(Boolean);
+  const base = parts.length > 0 ? parts.join(' | ') : fallback;
+  return error.code ? `${base} (code: ${error.code})` : base;
+}
+
 export async function saveUploadToSupabase(fileName: string, records: TuroTripRecord[], dashboard: DashboardData) {
   if (!supabase) {
     throw new Error(
@@ -16,24 +29,25 @@ export async function saveUploadToSupabase(fileName: string, records: TuroTripRe
     );
   }
 
-  const { data: uploadRow, error: uploadError } = await supabase
+  const uploadId = crypto.randomUUID();
+
+  const { error: uploadError } = await supabase
     .from('uploads')
     .insert({
+      id: uploadId,
       file_name: fileName,
       total_trips: dashboard.metrics.totalTrips,
       gross_revenue: dashboard.metrics.grossRevenue,
       net_earnings: dashboard.metrics.netEarnings,
       cancellation_rate: dashboard.metrics.cancellationRate,
-    })
-    .select('id')
-    .single();
+    });
 
   if (uploadError) {
-    throw uploadError;
+    throw new Error(formatSupabaseError(uploadError, 'Failed to insert upload row.'));
   }
 
   const payload = records.map((row) => ({
-    upload_id: uploadRow.id,
+    upload_id: uploadId,
     row_number: row.rowNumber,
     trip_start: row.tripStart.toISOString(),
     trip_end: row.tripEnd.toISOString(),
@@ -47,6 +61,6 @@ export async function saveUploadToSupabase(fileName: string, records: TuroTripRe
 
   const { error: tripsError } = await supabase.from('trips').insert(payload);
   if (tripsError) {
-    throw tripsError;
+    throw new Error(formatSupabaseError(tripsError, 'Failed to insert trip rows.'));
   }
 }

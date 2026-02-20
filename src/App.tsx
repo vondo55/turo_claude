@@ -6,6 +6,26 @@ import { buildDashboardData } from './lib/metrics';
 import { saveUploadToSupabase, supabase } from './lib/supabase';
 import type { DashboardData } from './lib/types';
 
+function getErrorMessage(caughtError: unknown) {
+  if (caughtError instanceof Error) {
+    return caughtError.message;
+  }
+
+  if (typeof caughtError === 'object' && caughtError !== null) {
+    const candidate = caughtError as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts = [candidate.message, candidate.details, candidate.hint]
+      .filter((value): value is string => typeof value === 'string' && value.length > 0);
+    if (parts.length > 0) {
+      const combined = parts.join(' | ');
+      return typeof candidate.code === 'string' && candidate.code.length > 0
+        ? `${combined} (code: ${candidate.code})`
+        : combined;
+    }
+  }
+
+  return 'Unknown upload error';
+}
+
 export default function App() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,8 +50,7 @@ export default function App() {
         await saveUploadToSupabase(file.name, parsed.records, dashboard);
       }
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : 'Unknown upload error';
-      setError(message);
+      setError(getErrorMessage(caughtError));
     } finally {
       setIsLoading(false);
     }

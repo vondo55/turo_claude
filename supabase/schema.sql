@@ -28,6 +28,11 @@ create table if not exists public.trips (
 alter table public.uploads enable row level security;
 alter table public.trips enable row level security;
 
+grant usage on schema public to anon, authenticated;
+grant insert on table public.uploads to anon, authenticated;
+grant insert on table public.trips to anon, authenticated;
+grant usage, select on sequence public.trips_id_seq to anon, authenticated;
+
 create policy "anon can insert uploads"
   on public.uploads
   for insert
