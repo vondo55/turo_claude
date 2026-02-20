@@ -12,6 +12,18 @@ Upload a raw Turo CSV export and get an immediate dashboard of business insights
 - Dashboard with KPIs + 3 charts
 - Optional Supabase persistence for uploads/trips
 
+Parser is tuned and verified against:
+- `/Users/seeker/Desktop/data_projects/Turo-analytics/data/raw/trip_earnings_export_20251116.csv`
+
+Primary mapped columns from that export:
+- `Trip start`
+- `Trip end`
+- `Trip price` (gross)
+- `Total earnings` (net)
+- `Vehicle name`
+- `Trip status`
+- `Extras`
+
 ## Quick Start (Localhost)
 
 ### 1. Install dependencies

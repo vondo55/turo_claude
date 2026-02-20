@@ -30,11 +30,11 @@ const recordSchema = z.object({
 const aliases = {
   tripStart: ['tripstart', 'startdate', 'pickupdate', 'tripstartdate', 'reservationstart'],
   tripEnd: ['tripend', 'enddate', 'dropoffdate', 'tripenddate', 'reservationend'],
-  grossRevenue: ['grossrevenue', 'tripprice', 'triptotal', 'totalearnings', 'revenue', 'gross'],
-  netEarnings: ['netearnings', 'hostearnings', 'netpayout', 'earnings'],
+  grossRevenue: ['tripprice', 'grossrevenue', 'triptotal', 'revenue', 'gross'],
+  netEarnings: ['totalearnings', 'netearnings', 'hostearnings', 'netpayout', 'earnings'],
   addonsRevenue: ['addonrevenue', 'extras', 'additionalincome', 'addons'],
-  vehicleName: ['vehicle', 'car', 'vehiclename', 'listingtitle'],
-  status: ['status', 'tripstatus', 'reservationstatus'],
+  vehicleName: ['vehiclename', 'vehicle', 'car', 'listingtitle'],
+  status: ['tripstatus', 'status', 'reservationstatus'],
   isCancelled: ['cancelled', 'iscancelled', 'canceled', 'iscanceled'],
 };
 
@@ -91,7 +91,11 @@ function parseDate(value: string): Date | null {
 function parseMoney(value: string | undefined): number | null {
   if (!value) return null;
 
-  const cleaned = value.replace(/[$,\s]/g, '').replace(/\((.*)\)/, '-$1');
+  const cleaned = value
+    .trim()
+    .replace(/[$,\s]/g, '')
+    .replace(/^\((.*)\)$/, '-$1');
+  if (cleaned === '' || cleaned === '-') return null;
   const number = Number(cleaned);
   return Number.isFinite(number) ? number : null;
 }

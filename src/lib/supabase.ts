@@ -2,14 +2,18 @@ import { createClient } from '@supabase/supabase-js';
 import type { DashboardData, TuroTripRecord } from './types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const supabaseClientKey = supabasePublishableKey ?? supabaseAnonKey;
 
 export const supabase =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+  supabaseUrl && supabaseClientKey ? createClient(supabaseUrl, supabaseClientKey) : null;
 
 export async function saveUploadToSupabase(fileName: string, records: TuroTripRecord[], dashboard: DashboardData) {
   if (!supabase) {
-    throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
   }
 
   const { data: uploadRow, error: uploadError } = await supabase
