@@ -13,7 +13,37 @@ type ColumnMap = {
   vehicleName?: string;
   status?: string;
   isCancelled?: string;
+  splitItemColumns: Partial<Record<SplitItem, string>>;
 };
+
+const splitRatios = {
+  'Trip price': { lrPct: 0.3, ownerPct: 0.7 },
+  'Boost price': { lrPct: 0.3, ownerPct: 0.7 },
+  'Cancellation fee': { lrPct: 0.3, ownerPct: 0.7 },
+  'Additional usage': { lrPct: 0.3, ownerPct: 0.7 },
+  'Excess distance': { lrPct: 0.0, ownerPct: 1.0 },
+  Smoking: { lrPct: 0.9, ownerPct: 0.1 },
+  Delivery: { lrPct: 0.9, ownerPct: 0.1 },
+  Extras: { lrPct: 1.0, ownerPct: 0.0 },
+  'Gas reimbursement': { lrPct: 1.0, ownerPct: 0.0 },
+  Cleaning: { lrPct: 1.0, ownerPct: 0.0 },
+  'Late fee': { lrPct: 1.0, ownerPct: 0.0 },
+  'Improper return fee': { lrPct: 1.0, ownerPct: 0.0 },
+  '3-day discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '1-week discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '2-week discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '1-month discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '2-month discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '3-month discount': { lrPct: 0.3, ownerPct: 0.7 },
+  'Early bird discount': { lrPct: 0.3, ownerPct: 0.7 },
+  'Host promotional credit': { lrPct: 0.3, ownerPct: 0.7 },
+  'On-trip EV charging': { lrPct: 1.0, ownerPct: 0.0 },
+  'Post-trip EV charging': { lrPct: 1.0, ownerPct: 0.0 },
+  'Tolls & tickets': { lrPct: 1.0, ownerPct: 0.0 },
+  'Other fees': { lrPct: 1.0, ownerPct: 0.0 },
+} as const;
+
+type SplitItem = keyof typeof splitRatios;
 
 const recordSchema = z.object({
   rowNumber: z.number().int().positive(),
@@ -23,6 +53,8 @@ const recordSchema = z.object({
   grossRevenue: z.number().finite(),
   netEarnings: z.number().finite().nullable(),
   addonsRevenue: z.number().finite().nullable(),
+  lrShare: z.number().finite(),
+  ownerShare: z.number().finite(),
   isCancelled: z.boolean(),
   status: z.string().nullable(),
 });
@@ -77,7 +109,19 @@ function buildColumnMap(headers: string[]): ColumnMap {
     vehicleName: findColumn(headers, aliases.vehicleName),
     status: findColumn(headers, aliases.status),
     isCancelled: findColumn(headers, aliases.isCancelled),
+    splitItemColumns: buildSplitItemColumns(headers),
   };
+}
+
+function buildSplitItemColumns(headers: string[]): Partial<Record<SplitItem, string>> {
+  const columns: Partial<Record<SplitItem, string>> = {};
+  for (const item of Object.keys(splitRatios) as SplitItem[]) {
+    const found = findColumn(headers, [normalizeHeader(item)]);
+    if (found) {
+      columns[item] = found;
+    }
+  }
+  return columns;
 }
 
 function parseDate(value: string): Date | null {
@@ -120,6 +164,15 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     throw new Error(`Row ${rowNumber}: invalid date or revenue format.`);
   }
 
+  let lrShare = 0;
+  let ownerShare = 0;
+  for (const item of Object.keys(splitRatios) as SplitItem[]) {
+    const columnName = map.splitItemColumns[item];
+    const amount = parseMoney(columnName ? raw[columnName] : undefined) ?? 0;
+    lrShare += amount * splitRatios[item].lrPct;
+    ownerShare += amount * splitRatios[item].ownerPct;
+  }
+
   const candidate: TuroTripRecord = {
     rowNumber,
     tripStart: start,
@@ -128,6 +181,8 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     grossRevenue: gross,
     netEarnings: map.netEarnings ? parseMoney(raw[map.netEarnings]) : null,
     addonsRevenue: map.addonsRevenue ? parseMoney(raw[map.addonsRevenue]) : null,
+    lrShare: Number(lrShare.toFixed(2)),
+    ownerShare: Number(ownerShare.toFixed(2)),
     isCancelled: parseCancelled(raw, map),
     status: map.status ? String(raw[map.status] ?? '').trim() || null : null,
   };

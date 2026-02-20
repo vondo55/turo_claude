@@ -6,6 +6,8 @@ export type TuroTripRecord = {
   grossRevenue: number;
   netEarnings: number | null;
   addonsRevenue: number | null;
+  lrShare: number;
+  ownerShare: number;
   isCancelled: boolean;
   status: string | null;
 };
@@ -19,6 +21,8 @@ export type DashboardMetrics = {
   totalTrips: number;
   grossRevenue: number;
   netEarnings: number | null;
+  lrShare: number;
+  ownerShare: number;
   averageTripValue: number;
   cancellationRate: number;
 };

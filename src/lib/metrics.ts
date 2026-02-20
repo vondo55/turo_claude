@@ -28,6 +28,8 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
 
   const netRows = records.filter((row) => row.netEarnings !== null);
   const netEarnings = netRows.length > 0 ? netRows.reduce((sum, row) => sum + (row.netEarnings ?? 0), 0) : null;
+  const lrShare = records.reduce((sum, row) => sum + row.lrShare, 0);
+  const ownerShare = records.reduce((sum, row) => sum + row.ownerShare, 0);
   const averageTripValue = totalTrips > 0 ? grossRevenue / totalTrips : 0;
 
   const cancelledCount = records.filter((row) => row.isCancelled).length;
@@ -76,6 +78,8 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
       totalTrips,
       grossRevenue: Number(grossRevenue.toFixed(2)),
       netEarnings: netEarnings === null ? null : Number(netEarnings.toFixed(2)),
+      lrShare: Number(lrShare.toFixed(2)),
+      ownerShare: Number(ownerShare.toFixed(2)),
       averageTripValue: Number(averageTripValue.toFixed(2)),
       cancellationRate: Number(cancellationRate.toFixed(1)),
     },

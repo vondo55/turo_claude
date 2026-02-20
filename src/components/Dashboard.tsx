@@ -44,6 +44,14 @@ export default function Dashboard({ data }: DashboardProps) {
           <p>{currency(data.metrics.netEarnings)}</p>
         </article>
         <article className="kpi-card">
+          <h3>LR Share</h3>
+          <p>{currency(data.metrics.lrShare)}</p>
+        </article>
+        <article className="kpi-card">
+          <h3>Owner Share</h3>
+          <p>{currency(data.metrics.ownerShare)}</p>
+        </article>
+        <article className="kpi-card">
           <h3>Avg Trip Value</h3>
           <p>{currency(data.metrics.averageTripValue)}</p>
         </article>
