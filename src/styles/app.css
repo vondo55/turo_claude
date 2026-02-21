@@ -75,6 +75,30 @@ body {
   gap: 0.4rem;
 }
 
+.filter-controls {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  background: #ffffffde;
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  box-shadow: 0 2px 18px rgba(16, 42, 67, 0.08);
+}
+
+.filter-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-controls select {
+  border: 1px solid #bcccdc;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+}
+
 .status,
 .error {
   margin-top: 0.8rem;
@@ -142,6 +166,11 @@ td {
   border-bottom: 1px solid #d9e2ec;
   text-align: left;
   padding: 0.5rem;
+}
+
+tfoot th {
+  font-weight: 700;
+  border-top: 2px solid #bcccdc;
 }
 
 @media (max-width: 640px) {

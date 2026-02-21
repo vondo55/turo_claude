@@ -20,6 +20,7 @@ export type ParseResult = {
 export type DashboardMetrics = {
   totalTrips: number;
   grossRevenue: number;
+  totalEarnings: number;
   netEarnings: number | null;
   lrShare: number;
   ownerShare: number;
@@ -27,10 +28,19 @@ export type DashboardMetrics = {
   cancellationRate: number;
 };
 
+export type VehicleBreakdown = {
+  vehicle: string;
+  trips: number;
+  totalEarnings: number;
+  lrShare: number;
+  ownerShare: number;
+};
+
 export type DashboardData = {
   metrics: DashboardMetrics;
   monthlyRevenue: Array<{ month: string; revenue: number }>;
   monthlyUtilization: Array<{ month: string; utilizationPct: number }>;
+  vehicleBreakdown: VehicleBreakdown[];
   vehiclePerformance: Array<{ vehicle: string; grossRevenue: number; tripCount: number }>;
   cancellationBreakdown: Array<{ name: string; value: number }>;
 };

@@ -40,6 +40,10 @@ export default function Dashboard({ data }: DashboardProps) {
           <p>{currency(data.metrics.grossRevenue)}</p>
         </article>
         <article className="kpi-card">
+          <h3>Total Earnings</h3>
+          <p>{currency(data.metrics.totalEarnings)}</p>
+        </article>
+        <article className="kpi-card">
           <h3>Net Earnings</h3>
           <p>{currency(data.metrics.netEarnings)}</p>
         </article>
@@ -104,24 +108,37 @@ export default function Dashboard({ data }: DashboardProps) {
       </div>
 
       <article className="table-card">
-        <h3>Top Vehicles by Revenue</h3>
+        <h3>Vehicle Breakdown</h3>
         <table>
           <thead>
             <tr>
               <th>Vehicle</th>
-              <th>Gross Revenue</th>
+              <th>Total Earnings</th>
               <th>Trips</th>
+              <th>LR Share</th>
+              <th>Owner Share</th>
             </tr>
           </thead>
           <tbody>
-            {data.vehiclePerformance.map((vehicle) => (
+            {data.vehicleBreakdown.map((vehicle) => (
               <tr key={vehicle.vehicle}>
                 <td>{vehicle.vehicle}</td>
-                <td>{currency(vehicle.grossRevenue)}</td>
-                <td>{vehicle.tripCount}</td>
+                <td>{currency(vehicle.totalEarnings)}</td>
+                <td>{vehicle.trips}</td>
+                <td>{currency(vehicle.lrShare)}</td>
+                <td>{currency(vehicle.ownerShare)}</td>
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr>
+              <th>Totals</th>
+              <th>{currency(data.metrics.totalEarnings)}</th>
+              <th>{data.metrics.totalTrips.toLocaleString()}</th>
+              <th>{currency(data.metrics.lrShare)}</th>
+              <th>{currency(data.metrics.ownerShare)}</th>
+            </tr>
+          </tfoot>
         </table>
       </article>
     </section>

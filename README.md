@@ -2,7 +2,7 @@
 
 Turo Codex is an MVP analytics app for Turo hosts.
 
-Upload a raw Turo CSV export and get an immediate dashboard of business insights (KPIs, trends, and top vehicles).
+Upload a raw Turo CSV export and get an immediate dashboard of business insights (KPIs, trends, and vehicle drilldowns).
 
 ## What Works Now
 
@@ -10,6 +10,10 @@ Upload a raw Turo CSV export and get an immediate dashboard of business insights
 - CSV parsing with flexible header matching
 - Required-field validation and row-level warnings
 - Dashboard with KPIs + 3 charts
+- `Completed trips only` filter
+- Month drilldown filter (by `Trip end`)
+- Vehicle breakdown table: total earnings, trips, LR share, owner share, plus totals row
+- LR/Owner split logic ported from legacy Python workflow
 - Optional Supabase persistence for uploads/trips
 
 Parser is tuned and verified against:
@@ -46,10 +50,10 @@ Use `/Users/seeker/Desktop/data_projects/turo_codex/sample/turo_sample.csv` in t
 
 ## Fastest Build Path From Here
 
-1. Confirm one real Turo CSV format and lock required columns.
+1. Add month-over-month comparison view.
 2. Add a column-mapping UI for unmatched headers.
-3. Save uploads in Supabase and add a historical comparison view.
-4. Add a simple auth layer (Supabase Auth) before multi-user rollout.
+3. Add Supabase read path for historical uploads in-app.
+4. Add parser and metrics tests for the real Turo CSV schema.
 
 ## Supabase Setup (Clear Step-by-Step)
 
@@ -106,5 +110,7 @@ Current SQL enables anonymous inserts for fast MVP testing. Before production:
 - `/Users/seeker/Desktop/data_projects/turo_codex/spec.md`: Product specification
 - `/Users/seeker/Desktop/data_projects/turo_codex/src/lib/csv.ts`: CSV parsing + validation
 - `/Users/seeker/Desktop/data_projects/turo_codex/src/lib/metrics.ts`: KPI/insight calculations
+- `/Users/seeker/Desktop/data_projects/turo_codex/src/components/Dashboard.tsx`: KPI/charts/vehicle breakdown UI
+- `/Users/seeker/Desktop/data_projects/turo_codex/src/App.tsx`: Upload flow + filtering controls
 - `/Users/seeker/Desktop/data_projects/turo_codex/src/lib/supabase.ts`: Supabase persistence
 - `/Users/seeker/Desktop/data_projects/turo_codex/supabase/schema.sql`: Database schema + policies

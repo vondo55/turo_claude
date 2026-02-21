@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Dashboard from './components/Dashboard';
 import UploadZone from './components/UploadZone';
 import { parseTuroCsv } from './lib/csv';
 import { buildDashboardData } from './lib/metrics';
 import { saveUploadToSupabase, supabase } from './lib/supabase';
-import type { DashboardData } from './lib/types';
+import type { DashboardData, TuroTripRecord } from './lib/types';
 
 function getErrorMessage(caughtError: unknown) {
   if (caughtError instanceof Error) {
@@ -27,12 +27,55 @@ function getErrorMessage(caughtError: unknown) {
 }
 
 export default function App() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [records, setRecords] = useState<TuroTripRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [saveToSupabase, setSaveToSupabase] = useState(false);
   const [lastFileName, setLastFileName] = useState<string | null>(null);
+  const [completedOnly, setCompletedOnly] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState('all');
+
+  const monthOptions = useMemo(() => {
+    const uniqueMonths = new Set(
+      records.map((record) =>
+        `${record.tripEnd.getFullYear()}-${String(record.tripEnd.getMonth() + 1).padStart(2, '0')}`
+      )
+    );
+
+    return Array.from(uniqueMonths)
+      .sort((a, b) => a.localeCompare(b))
+      .map((value) => {
+        const [year, month] = value.split('-').map(Number);
+        const label = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        return { value, label };
+      });
+  }, [records]);
+
+  const filteredRecords = useMemo(() => {
+    return records.filter((record) => {
+      const status = (record.status ?? '').toLowerCase();
+      if (completedOnly && status !== 'completed') {
+        return false;
+      }
+
+      if (selectedMonth !== 'all') {
+        const key = `${record.tripEnd.getFullYear()}-${String(record.tripEnd.getMonth() + 1).padStart(2, '0')}`;
+        if (key !== selectedMonth) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [completedOnly, records, selectedMonth]);
+
+  const data: DashboardData | null = useMemo(() => {
+    if (filteredRecords.length === 0) {
+      return null;
+    }
+    return buildDashboardData(filteredRecords);
+  }, [filteredRecords]);
 
   async function handleFile(file: File) {
     setError(null);
@@ -41,12 +84,13 @@ export default function App() {
 
     try {
       const parsed = await parseTuroCsv(file);
-      const dashboard = buildDashboardData(parsed.records);
-      setData(dashboard);
+      setRecords(parsed.records);
+      setSelectedMonth('all');
       setWarnings(parsed.warnings);
       setLastFileName(file.name);
 
       if (saveToSupabase) {
+        const dashboard = buildDashboardData(parsed.records);
         await saveUploadToSupabase(file.name, parsed.records, dashboard);
       }
     } catch (caughtError) {
@@ -98,7 +142,27 @@ export default function App() {
         </section>
       ) : null}
 
-      {data ? <Dashboard data={data} /> : null}
+      {records.length > 0 ? (
+        <section className="filter-controls">
+          <label>
+            <input type="checkbox" checked={completedOnly} onChange={(event) => setCompletedOnly(event.target.checked)} />
+            Completed trips only
+          </label>
+          <label>
+            Month
+            <select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
+              <option value="all">All months</option>
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      ) : null}
+
+      {data ? <Dashboard data={data} /> : records.length > 0 ? <p className="status">No rows match current filters.</p> : null}
     </main>
   );
 }

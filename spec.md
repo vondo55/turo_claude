@@ -24,7 +24,7 @@ Deliver the first end-to-end workflow:
 - CSV upload via drag-and-drop or file picker
 - CSV parsing and schema validation
 - Basic data normalization (dates, currency, percentages)
-- Dashboard with core metrics and charts
+- Dashboard with core metrics, filters, and charts
 - Error messaging for invalid or incomplete files
 
 ### Out of Scope (MVP)
@@ -42,21 +42,41 @@ Independent Turo host or small fleet operator who wants quick visibility into bu
 
 - Total trips
 - Gross revenue
+- Total earnings
 - Net earnings (if present in CSV)
+- LR share
+- Owner share
 - Average trip value
 - Utilization trend by week or month
-- Top performing vehicles (if vehicle-level data exists)
+- Vehicle-level breakdown (earnings, trips, LR/Owner)
 - Cancellations and cancellation rate
 - Optional add-ons contribution (if available)
+
+## Current Implemented Features
+
+- Upload and parse Turo CSV export files
+- Flexible header matching tuned to real export format
+- Row-level warning system for parse/validation issues
+- KPI dashboard + trend charts
+- `Completed trips only` toggle
+- Month filter (based on `Trip end`)
+- Vehicle drilldown table with totals footer:
+  - Total earnings
+  - Number of trips
+  - LR share
+  - Owner share
+- LR/Owner split logic ported from legacy Python transformation
+- Optional Supabase persistence for uploaded datasets
 
 ## Functional Requirements
 
 1. Accept CSV file up to an agreed max size (ex: 25 MB).
 2. Detect required columns and show missing-column feedback.
 3. Parse and store cleaned records in app state/database.
-4. Generate KPI cards and at least 3 charts.
-5. Allow user to re-upload and replace dataset.
-6. Show processing/loading states.
+4. Generate KPI cards, at least 3 charts, and vehicle drilldown table.
+5. Support completed-only and month-level filtering.
+6. Allow user to re-upload and replace dataset.
+7. Show processing/loading states.
 
 ## Non-Functional Requirements
 
@@ -70,7 +90,7 @@ Independent Turo host or small fleet operator who wants quick visibility into bu
 ### Phase 2
 
 - Save multiple uploads and compare date ranges
-- Vehicle-level profitability view
+- Month-over-month comparison view
 - Export dashboard summary as PDF/CSV
 
 ### Phase 3
@@ -86,15 +106,15 @@ Independent Turo host or small fleet operator who wants quick visibility into bu
 
 ## Open Questions
 
-- Which exact Turo CSV formats are supported first?
-- Where should data be stored in v1 (local only vs hosted DB)?
-- Should uploads persist between sessions in MVP?
-- Which charting library best fits speed and maintainability goals?
+- Do we enforce `Completed only` as default in production?
+- Should month filter use `Trip end` (current) or make `Trip start/end` selectable?
+- Should historical comparison be per-upload, per-month, or both?
+- What is the target auth model for Supabase (single owner vs multi-account)?
 
 ## Milestones
 
-1. Lock CSV schema and MVP metrics.
-2. Implement upload, parse, and validation pipeline.
-3. Build dashboard KPIs and charts.
-4. QA with real Turo export samples.
-5. Ship MVP.
+1. Lock CSV schema and LR/Owner split assumptions.
+2. Complete historical data read path from Supabase.
+3. Add month-over-month comparison module.
+4. Add parser/metrics tests using real export fixtures.
+5. Ship MVP with persistence and comparison features.

@@ -25,6 +25,7 @@ function daysInMonth(year: number, monthIndex: number): number {
 export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
   const totalTrips = records.length;
   const grossRevenue = records.reduce((sum, row) => sum + row.grossRevenue, 0);
+  const totalEarnings = records.reduce((sum, row) => sum + (row.netEarnings ?? row.grossRevenue), 0);
 
   const netRows = records.filter((row) => row.netEarnings !== null);
   const netEarnings = netRows.length > 0 ? netRows.reduce((sum, row) => sum + (row.netEarnings ?? 0), 0) : null;
@@ -73,10 +74,31 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
     .sort((a, b) => b.grossRevenue - a.grossRevenue)
     .slice(0, 8);
 
+  const vehicleBreakdownMap = new Map<string, { trips: number; totalEarnings: number; lrShare: number; ownerShare: number }>();
+  for (const row of records) {
+    const current = vehicleBreakdownMap.get(row.vehicleName) ?? { trips: 0, totalEarnings: 0, lrShare: 0, ownerShare: 0 };
+    current.trips += 1;
+    current.totalEarnings += row.netEarnings ?? row.grossRevenue;
+    current.lrShare += row.lrShare;
+    current.ownerShare += row.ownerShare;
+    vehicleBreakdownMap.set(row.vehicleName, current);
+  }
+
+  const vehicleBreakdown = Array.from(vehicleBreakdownMap.entries())
+    .map(([vehicle, values]) => ({
+      vehicle,
+      trips: values.trips,
+      totalEarnings: Number(values.totalEarnings.toFixed(2)),
+      lrShare: Number(values.lrShare.toFixed(2)),
+      ownerShare: Number(values.ownerShare.toFixed(2)),
+    }))
+    .sort((a, b) => b.totalEarnings - a.totalEarnings);
+
   return {
     metrics: {
       totalTrips,
       grossRevenue: Number(grossRevenue.toFixed(2)),
+      totalEarnings: Number(totalEarnings.toFixed(2)),
       netEarnings: netEarnings === null ? null : Number(netEarnings.toFixed(2)),
       lrShare: Number(lrShare.toFixed(2)),
       ownerShare: Number(ownerShare.toFixed(2)),
@@ -85,6 +107,7 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
     },
     monthlyRevenue,
     monthlyUtilization,
+    vehicleBreakdown,
     vehiclePerformance,
     cancellationBreakdown: [
       { name: 'Completed', value: Math.max(0, totalTrips - cancelledCount) },
