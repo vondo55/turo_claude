@@ -66,7 +66,23 @@ Independent Turo host or small fleet operator who wants quick visibility into bu
   - LR share
   - Owner share
 - LR/Owner split logic ported from legacy Python transformation
+- Cents-based accounting math for aggregation (reduces floating-point rounding drift)
+- Allocation policy recorded in decision log and mapped in parser
 - Optional Supabase persistence for uploaded datasets
+
+## Analytics Views (Planned Structure)
+
+- `Overview`: high-level KPIs and trend summaries
+- `Owner Economics`: earnings allocation, split ratios, and reconciliation trust metrics
+- `Fleet Operations`: utilization, downtime, and vehicle-level operational metrics
+
+## Accounting and Reconciliation Rules
+
+- `Total earnings` is sourced from CSV `Total earnings`.
+- `LR Share` and `Owner Share` are computed from mapped line-items per allocation policy.
+- `Reconciliation Gap = Total earnings - (LR Share + Owner Share)`.
+- All monetary aggregation is performed in integer cents and rounded for display only.
+- Current policy intent is `Reconciliation Gap ~= 0` (except display-level rounding).
 
 ## Functional Requirements
 
@@ -110,11 +126,13 @@ Independent Turo host or small fleet operator who wants quick visibility into bu
 - Should month filter use `Trip end` (current) or make `Trip start/end` selectable?
 - Should historical comparison be per-upload, per-month, or both?
 - What is the target auth model for Supabase (single owner vs multi-account)?
+- Should labor-based metrics live in `Owner Economics` or a separate modeling section?
+- Should downtime be calendar-based only, or adjusted by listing active windows?
 
 ## Milestones
 
 1. Lock CSV schema and LR/Owner split assumptions.
-2. Complete historical data read path from Supabase.
-3. Add month-over-month comparison module.
-4. Add parser/metrics tests using real export fixtures.
-5. Ship MVP with persistence and comparison features.
+2. Ship tabbed analytics views (`Overview`, `Owner Economics`, `Fleet Operations`).
+3. Add vehicle-level downtime metrics with clear definitions.
+4. Complete historical data read path from Supabase.
+5. Add parser/metrics tests using real export fixtures and reconciliation checks.

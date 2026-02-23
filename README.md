@@ -14,7 +14,16 @@ Upload a raw Turo CSV export and get an immediate dashboard of business insights
 - Month drilldown filter (by `Trip end`)
 - Vehicle breakdown table: total earnings, trips, LR share, owner share, plus totals row
 - LR/Owner split logic ported from legacy Python workflow
+- Cents-based aggregation for improved accounting precision
 - Optional Supabase persistence for uploads/trips
+
+## Accounting Notes
+
+- `Total Earnings` is taken from CSV `Total earnings`.
+- `LR Share` and `Owner Share` are computed from mapped line-items defined in:
+  - `/Users/seeker/Desktop/data_projects/turo_codex/docs/decisions/0001-line-item-allocation.md`
+- `Reconciliation Gap = Total Earnings - (LR Share + Owner Share)`.
+- Aggregations use integer cents internally and round only for display.
 
 Parser is tuned and verified against:
 - `/Users/seeker/Desktop/data_projects/Turo-analytics/data/raw/trip_earnings_export_20251116.csv`
@@ -50,10 +59,11 @@ Use `/Users/seeker/Desktop/data_projects/turo_codex/sample/turo_sample.csv` in t
 
 ## Fastest Build Path From Here
 
-1. Add month-over-month comparison view.
-2. Add a column-mapping UI for unmatched headers.
-3. Add Supabase read path for historical uploads in-app.
-4. Add parser and metrics tests for the real Turo CSV schema.
+1. Add tabbed analytics views (`Overview`, `Owner Economics`, `Fleet Operations`).
+2. Add vehicle-level downtime metrics and charts.
+3. Add a column-mapping UI for unmatched headers.
+4. Add Supabase read path for historical uploads in-app.
+5. Add parser and metrics tests for the real Turo CSV schema.
 
 ## Supabase Setup (Clear Step-by-Step)
 
