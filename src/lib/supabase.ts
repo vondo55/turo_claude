@@ -18,7 +18,6 @@ type SupabaseErrorLike = {
 
 type SaveUploadResult = {
   duplicateUpload: boolean;
-  tripsRecovered: boolean;
 };
 
 function formatSupabaseError(error: SupabaseErrorLike, fallback: string) {
@@ -32,26 +31,17 @@ function formatUuidFromBytes(bytes: Uint8Array) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-async function buildDeterministicUploadId(records: TuroTripRecord[]) {
-  const canonical = records
-    .map((row) =>
-      [
-        row.rowNumber,
-        row.tripStart.toISOString(),
-        row.tripEnd.toISOString(),
-        row.vehicleName,
-        row.ownerName,
-        row.grossRevenue,
-        row.netEarnings ?? '',
-        row.addonsRevenue ?? '',
-        row.isCancelled ? 1 : 0,
-        row.status ?? '',
-      ].join('|')
-    )
-    .join('\n');
+function buildUploadIdFromFileHash(fileHashHex: string) {
+  const normalized = fileHashHex.trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    throw new Error('Invalid file hash. Expected SHA-256 hex string.');
+  }
 
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
-  const bytes = new Uint8Array(digest).slice(0, 16);
+  const bytes = new Uint8Array(16);
+  for (let index = 0; index < 16; index += 1) {
+    bytes[index] = Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16);
+  }
+
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   return formatUuidFromBytes(bytes);
@@ -60,7 +50,8 @@ async function buildDeterministicUploadId(records: TuroTripRecord[]) {
 export async function saveUploadToSupabase(
   fileName: string,
   records: TuroTripRecord[],
-  dashboard: DashboardData
+  dashboard: DashboardData,
+  fileHashHex: string
 ): Promise<SaveUploadResult> {
   if (!supabase) {
     throw new Error(
@@ -68,7 +59,7 @@ export async function saveUploadToSupabase(
     );
   }
 
-  const uploadId = await buildDeterministicUploadId(records);
+  const uploadId = buildUploadIdFromFileHash(fileHashHex);
 
   const { error: uploadError } = await supabase
     .from('uploads')
@@ -102,19 +93,7 @@ export async function saveUploadToSupabase(
   }));
 
   if (duplicateUpload) {
-    const { error: recoveryError } = await supabase.from('trips').upsert(payload, {
-      onConflict: 'upload_id,row_number',
-      ignoreDuplicates: true,
-    });
-
-    if (recoveryError) {
-      if (recoveryError.code === '42P10') {
-        return { duplicateUpload: true, tripsRecovered: false };
-      }
-      throw new Error(formatSupabaseError(recoveryError, 'Failed to backfill trip rows.'));
-    }
-
-    return { duplicateUpload: true, tripsRecovered: true };
+    return { duplicateUpload: true };
   }
 
   const { error: tripsError } = await supabase.from('trips').insert(payload);
@@ -123,5 +102,5 @@ export async function saveUploadToSupabase(
     throw new Error(formatSupabaseError(tripsError, 'Failed to insert trip rows.'));
   }
 
-  return { duplicateUpload: false, tripsRecovered: false };
+  return { duplicateUpload: false };
 }

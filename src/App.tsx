@@ -27,6 +27,11 @@ function getErrorMessage(caughtError: unknown) {
   return 'Unknown upload error';
 }
 
+async function computeFileSha256Hex(file: File) {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
 export default function App() {
   const [records, setRecords] = useState<TuroTripRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -140,12 +145,11 @@ export default function App() {
           (record) => (record.status ?? '').trim().toLowerCase() === 'completed'
         );
         const dashboard = buildDashboardData(completedOnlyRecords);
-        const result = await saveUploadToSupabase(file.name, parsed.records, dashboard);
+        const fileHashHex = await computeFileSha256Hex(file);
+        const result = await saveUploadToSupabase(file.name, parsed.records, dashboard, fileHashHex);
         setInfo(
           result.duplicateUpload
-            ? result.tripsRecovered
-              ? 'This file already existed in uploads. Missing trip rows were recovered.'
-              : 'This file is already stored in Supabase. Duplicate rows were skipped.'
+            ? 'This exact file is already stored in Supabase. Duplicate rows were skipped.'
             : 'Saved to Supabase successfully.'
         );
       }
