@@ -108,6 +108,7 @@ Current SQL enables anonymous inserts for fast MVP testing. Before production:
 ## Project Files
 
 - `/Users/seeker/Desktop/data_projects/turo_codex/spec.md`: Product specification
+- `/Users/seeker/Desktop/data_projects/turo_codex/docs/decisions/0001-line-item-allocation.md`: Allocation policy decision log
 - `/Users/seeker/Desktop/data_projects/turo_codex/src/lib/csv.ts`: CSV parsing + validation
 - `/Users/seeker/Desktop/data_projects/turo_codex/src/lib/metrics.ts`: KPI/insight calculations
 - `/Users/seeker/Desktop/data_projects/turo_codex/src/components/Dashboard.tsx`: KPI/charts/vehicle breakdown UI

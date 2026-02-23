@@ -16,9 +16,20 @@ type ColumnMap = {
   splitItemColumns: Partial<Record<SplitItem, string>>;
 };
 
+// Allocation policy: see docs/decisions/0001-line-item-allocation.md
 const splitRatios = {
   'Trip price': { lrPct: 0.3, ownerPct: 0.7 },
   'Boost price': { lrPct: 0.3, ownerPct: 0.7 },
+  '3-day discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '1-week discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '2-week discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '3-week discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '1-month discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '2-month discount': { lrPct: 0.3, ownerPct: 0.7 },
+  '3-month discount': { lrPct: 0.3, ownerPct: 0.7 },
+  'Non-refundable discount': { lrPct: 0.3, ownerPct: 0.7 },
+  'Early bird discount': { lrPct: 0.3, ownerPct: 0.7 },
+  'Host promotional credit': { lrPct: 0.3, ownerPct: 0.7 },
   'Cancellation fee': { lrPct: 0.3, ownerPct: 0.7 },
   'Additional usage': { lrPct: 0.3, ownerPct: 0.7 },
   'Excess distance': { lrPct: 0.0, ownerPct: 1.0 },
@@ -29,18 +40,15 @@ const splitRatios = {
   Cleaning: { lrPct: 1.0, ownerPct: 0.0 },
   'Late fee': { lrPct: 1.0, ownerPct: 0.0 },
   'Improper return fee': { lrPct: 1.0, ownerPct: 0.0 },
-  '3-day discount': { lrPct: 0.3, ownerPct: 0.7 },
-  '1-week discount': { lrPct: 0.3, ownerPct: 0.7 },
-  '2-week discount': { lrPct: 0.3, ownerPct: 0.7 },
-  '1-month discount': { lrPct: 0.3, ownerPct: 0.7 },
-  '2-month discount': { lrPct: 0.3, ownerPct: 0.7 },
-  '3-month discount': { lrPct: 0.3, ownerPct: 0.7 },
-  'Early bird discount': { lrPct: 0.3, ownerPct: 0.7 },
-  'Host promotional credit': { lrPct: 0.3, ownerPct: 0.7 },
+  'Airport operations fee': { lrPct: 1.0, ownerPct: 0.0 },
+  'Airport parking credit': { lrPct: 1.0, ownerPct: 0.0 },
   'On-trip EV charging': { lrPct: 1.0, ownerPct: 0.0 },
   'Post-trip EV charging': { lrPct: 1.0, ownerPct: 0.0 },
   'Tolls & tickets': { lrPct: 1.0, ownerPct: 0.0 },
+  'Fines (paid to host)': { lrPct: 0.0, ownerPct: 1.0 },
   'Other fees': { lrPct: 1.0, ownerPct: 0.0 },
+  'Gas fee': { lrPct: 1.0, ownerPct: 0.0 },
+  'Sales tax': { lrPct: 1.0, ownerPct: 0.0 },
 } as const;
 
 type SplitItem = keyof typeof splitRatios;
@@ -181,8 +189,8 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     grossRevenue: gross,
     netEarnings: map.netEarnings ? parseMoney(raw[map.netEarnings]) : null,
     addonsRevenue: map.addonsRevenue ? parseMoney(raw[map.addonsRevenue]) : null,
-    lrShare: Number(lrShare.toFixed(2)),
-    ownerShare: Number(ownerShare.toFixed(2)),
+    lrShare,
+    ownerShare,
     isCancelled: parseCancelled(raw, map),
     status: map.status ? String(raw[map.status] ?? '').trim() || null : null,
   };
