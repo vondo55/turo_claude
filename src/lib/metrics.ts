@@ -1,5 +1,16 @@
 import type { DashboardData, TuroTripRecord } from './types';
 
+const LABOR_HOURS_PER_BOOKING = 2;
+const LABOR_RATE_PER_HOUR = 15;
+
+function roundCurrency(value: number): number {
+  return Number(value.toFixed(2));
+}
+
+function roundPct(value: number): number {
+  return Number(value.toFixed(2));
+}
+
 function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
@@ -24,14 +35,22 @@ function daysInMonth(year: number, monthIndex: number): number {
 
 export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
   const totalTrips = records.length;
+  const totalBookings = totalTrips;
+  const activeMonths = Math.max(1, new Set(records.map((row) => monthKey(row.tripEnd))).size);
   const grossRevenue = records.reduce((sum, row) => sum + row.grossRevenue, 0);
   const totalEarnings = records.reduce((sum, row) => sum + (row.netEarnings ?? row.grossRevenue), 0);
 
-  const netRows = records.filter((row) => row.netEarnings !== null);
+  const netRows = records.filter((row) => row.netEarnings !== null && row.netEarnings !== undefined);
   const netEarnings = netRows.length > 0 ? netRows.reduce((sum, row) => sum + (row.netEarnings ?? 0), 0) : null;
   const lrShare = records.reduce((sum, row) => sum + row.lrShare, 0);
   const ownerShare = records.reduce((sum, row) => sum + row.ownerShare, 0);
   const averageTripValue = totalTrips > 0 ? grossRevenue / totalTrips : 0;
+  const totalLaborHours = totalBookings * LABOR_HOURS_PER_BOOKING;
+  const laborCost = totalLaborHours * LABOR_RATE_PER_HOUR;
+  const lrSharePerLaborHour = totalLaborHours > 0 ? lrShare / totalLaborHours : 0;
+  const laborToLrSharePct = lrShare > 0 ? (laborCost / lrShare) * 100 : 0;
+  const averageMonthlyLrShare = activeMonths > 0 ? lrShare / activeMonths : 0;
+  const lrSharePerBooking = totalBookings > 0 ? lrShare / totalBookings : 0;
 
   const cancelledCount = records.filter((row) => row.isCancelled).length;
   const cancellationRate = totalTrips > 0 ? (cancelledCount / totalTrips) * 100 : 0;
@@ -56,7 +75,7 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
 
   const monthlyRevenue = Array.from(revenueByMonth.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, revenue]) => ({ month: monthLabel(key), revenue: Number(revenue.toFixed(2)) }));
+    .map(([key, revenue]) => ({ month: monthLabel(key), revenue: roundCurrency(revenue) }));
 
   const monthlyUtilization = Array.from(bookedDaysByMonth.entries())
     .sort(([a], [b]) => a.localeCompare(b))
@@ -72,56 +91,84 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => ({
       month: monthLabel(key),
-      lrShare: Number(value.lrShare.toFixed(2)),
-      ownerShare: Number(value.ownerShare.toFixed(2)),
+      lrShare: roundCurrency(value.lrShare),
+      ownerShare: roundCurrency(value.ownerShare),
     }));
 
-  const vehicleMap = new Map<string, { grossRevenue: number; tripCount: number }>();
+  const vehicleMap = new Map<string, { ownerName: string; grossRevenue: number; tripCount: number }>();
   for (const row of records) {
-    const current = vehicleMap.get(row.vehicleName) ?? { grossRevenue: 0, tripCount: 0 };
+    const current = vehicleMap.get(row.vehicleName) ?? { ownerName: row.ownerName, grossRevenue: 0, tripCount: 0 };
     current.grossRevenue += row.grossRevenue;
     current.tripCount += 1;
+    current.ownerName = row.ownerName;
     vehicleMap.set(row.vehicleName, current);
   }
 
   const vehiclePerformance = Array.from(vehicleMap.entries())
     .map(([vehicle, values]) => ({
       vehicle,
-      grossRevenue: Number(values.grossRevenue.toFixed(2)),
+      ownerName: values.ownerName,
+      grossRevenue: roundCurrency(values.grossRevenue),
       tripCount: values.tripCount,
     }))
     .sort((a, b) => b.grossRevenue - a.grossRevenue)
     .slice(0, 8);
 
-  const vehicleBreakdownMap = new Map<string, { trips: number; totalEarnings: number; lrShare: number; ownerShare: number }>();
+  const vehicleBreakdownMap = new Map<
+    string,
+    { ownerName: string; trips: number; totalEarnings: number; lrShare: number; ownerShare: number }
+  >();
   for (const row of records) {
-    const current = vehicleBreakdownMap.get(row.vehicleName) ?? { trips: 0, totalEarnings: 0, lrShare: 0, ownerShare: 0 };
+    const current = vehicleBreakdownMap.get(row.vehicleName) ?? {
+      ownerName: row.ownerName,
+      trips: 0,
+      totalEarnings: 0,
+      lrShare: 0,
+      ownerShare: 0,
+    };
     current.trips += 1;
     current.totalEarnings += row.netEarnings ?? row.grossRevenue;
     current.lrShare += row.lrShare;
     current.ownerShare += row.ownerShare;
+    current.ownerName = row.ownerName;
     vehicleBreakdownMap.set(row.vehicleName, current);
   }
 
   const vehicleBreakdown = Array.from(vehicleBreakdownMap.entries())
     .map(([vehicle, values]) => ({
       vehicle,
+      ownerName: values.ownerName,
       trips: values.trips,
-      totalEarnings: Number(values.totalEarnings.toFixed(2)),
-      lrShare: Number(values.lrShare.toFixed(2)),
-      ownerShare: Number(values.ownerShare.toFixed(2)),
+      totalBookings: values.trips,
+      totalEarnings: roundCurrency(values.totalEarnings),
+      lrShare: roundCurrency(values.lrShare),
+      ownerShare: roundCurrency(values.ownerShare),
+      totalLaborHours: values.trips * LABOR_HOURS_PER_BOOKING,
+      laborCost: roundCurrency(values.trips * LABOR_HOURS_PER_BOOKING * LABOR_RATE_PER_HOUR),
+      lrSharePerLaborHour: values.trips > 0 ? roundCurrency(values.lrShare / (values.trips * LABOR_HOURS_PER_BOOKING)) : 0,
+      laborToLrSharePct: values.lrShare > 0 ? roundPct(((values.trips * LABOR_HOURS_PER_BOOKING * LABOR_RATE_PER_HOUR) / values.lrShare) * 100) : 0,
+      averageMonthlyLrShare: roundCurrency(values.lrShare / activeMonths),
+      lrSharePerBooking: values.trips > 0 ? roundCurrency(values.lrShare / values.trips) : 0,
     }))
     .sort((a, b) => b.totalEarnings - a.totalEarnings);
 
   return {
     metrics: {
       totalTrips,
-      grossRevenue: Number(grossRevenue.toFixed(2)),
-      totalEarnings: Number(totalEarnings.toFixed(2)),
-      netEarnings: netEarnings === null ? null : Number(netEarnings.toFixed(2)),
-      lrShare: Number(lrShare.toFixed(2)),
-      ownerShare: Number(ownerShare.toFixed(2)),
-      averageTripValue: Number(averageTripValue.toFixed(2)),
+      totalBookings,
+      activeMonths,
+      grossRevenue: roundCurrency(grossRevenue),
+      totalEarnings: roundCurrency(totalEarnings),
+      netEarnings: netEarnings === null ? null : roundCurrency(netEarnings),
+      lrShare: roundCurrency(lrShare),
+      ownerShare: roundCurrency(ownerShare),
+      averageTripValue: roundCurrency(averageTripValue),
+      totalLaborHours,
+      laborCost: roundCurrency(laborCost),
+      lrSharePerLaborHour: roundCurrency(lrSharePerLaborHour),
+      laborToLrSharePct: roundPct(laborToLrSharePct),
+      averageMonthlyLrShare: roundCurrency(averageMonthlyLrShare),
+      lrSharePerBooking: roundCurrency(lrSharePerBooking),
       cancellationRate: Number(cancellationRate.toFixed(1)),
     },
     monthlyRevenue,
