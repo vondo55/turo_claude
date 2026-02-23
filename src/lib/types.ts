@@ -3,6 +3,7 @@ export type TuroTripRecord = {
   tripStart: Date;
   tripEnd: Date;
   vehicleName: string;
+  ownerName: string;
   grossRevenue: number;
   netEarnings: number | null;
   addonsRevenue: number | null;
@@ -19,21 +20,37 @@ export type ParseResult = {
 
 export type DashboardMetrics = {
   totalTrips: number;
+  totalBookings: number;
+  activeMonths: number;
   grossRevenue: number;
   totalEarnings: number;
   netEarnings: number | null;
   lrShare: number;
   ownerShare: number;
   averageTripValue: number;
+  totalLaborHours: number;
+  laborCost: number;
+  lrSharePerLaborHour: number;
+  laborToLrSharePct: number;
+  averageMonthlyLrShare: number;
+  lrSharePerBooking: number;
   cancellationRate: number;
 };
 
 export type VehicleBreakdown = {
   vehicle: string;
+  ownerName: string;
   trips: number;
+  totalBookings: number;
   totalEarnings: number;
   lrShare: number;
   ownerShare: number;
+  totalLaborHours: number;
+  laborCost: number;
+  lrSharePerLaborHour: number;
+  laborToLrSharePct: number;
+  averageMonthlyLrShare: number;
+  lrSharePerBooking: number;
 };
 
 export type DashboardData = {
@@ -42,5 +59,5 @@ export type DashboardData = {
   monthlyUtilization: Array<{ month: string; utilizationPct: number }>;
   monthlySplit: Array<{ month: string; lrShare: number; ownerShare: number }>;
   vehicleBreakdown: VehicleBreakdown[];
-  vehiclePerformance: Array<{ vehicle: string; grossRevenue: number; tripCount: number }>;
+  vehiclePerformance: Array<{ vehicle: string; ownerName: string; grossRevenue: number; tripCount: number }>;
 };

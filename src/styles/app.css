@@ -93,10 +93,99 @@ body {
   gap: 0.5rem;
 }
 
+.filter-note {
+  margin: 0;
+  font-weight: 600;
+  color: #334e68;
+}
+
 .filter-controls select {
   border: 1px solid #bcccdc;
   border-radius: 6px;
   padding: 0.3rem 0.5rem;
+}
+
+.multi-select {
+  min-width: 210px;
+}
+
+.multi-select-label {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.85rem;
+  color: #334e68;
+  font-weight: 600;
+}
+
+.multi-select-menu {
+  position: relative;
+}
+
+.multi-select-menu summary {
+  list-style: none;
+  border: 1px solid #bcccdc;
+  border-radius: 6px;
+  padding: 0.38rem 0.5rem;
+  background: #fff;
+  cursor: pointer;
+  color: #102a43;
+  min-height: 2rem;
+}
+
+.multi-select-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.multi-select-menu[open] summary {
+  border-color: #1f8a70;
+}
+
+.multi-select-panel {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  width: min(340px, 78vw);
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(16, 42, 67, 0.12);
+  padding: 0.55rem;
+  z-index: 10;
+}
+
+.multi-select-panel input[type='search'] {
+  width: 100%;
+  border: 1px solid #bcccdc;
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+}
+
+.multi-select-list {
+  margin-top: 0.45rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.28rem 0.1rem;
+}
+
+.multi-select-empty {
+  margin: 0.2rem 0;
+  color: #627d98;
+}
+
+.multi-select-clear {
+  margin-top: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: #0b6e4f;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem 0;
 }
 
 .status,
@@ -221,5 +310,14 @@ tfoot th {
   .tab-button {
     font-size: 0.9rem;
     padding: 0.4rem 0.7rem;
+  }
+
+  .multi-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .multi-select-panel {
+    width: 100%;
   }
 }

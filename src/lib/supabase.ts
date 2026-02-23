@@ -40,6 +40,7 @@ async function buildDeterministicUploadId(records: TuroTripRecord[]) {
         row.tripStart.toISOString(),
         row.tripEnd.toISOString(),
         row.vehicleName,
+        row.ownerName,
         row.grossRevenue,
         row.netEarnings ?? '',
         row.addonsRevenue ?? '',

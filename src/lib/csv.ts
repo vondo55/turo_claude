@@ -317,7 +317,13 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
   const ownerFromParts = [ownerFirst, ownerLast].filter(Boolean).join(' ').trim();
   const ownerFromVehicleColumns =
     cleanVehicleName && rawVehicleName ? extractOwnerFromVehicleColumns(rawVehicleName, cleanVehicleName) : null;
-  const ownerName = ownerFromColumn || ownerFromParts || ownerFromVehicleColumns || extractOwnerName(vehicleName);
+  const ownerFromRawVehicle = rawVehicleName ? extractOwnerName(rawVehicleName) : 'Unknown owner';
+  const ownerFromCleanVehicle = cleanVehicleName ? extractOwnerName(cleanVehicleName) : 'Unknown owner';
+  const ownerName =
+    ownerFromColumn ||
+    ownerFromParts ||
+    ownerFromVehicleColumns ||
+    (ownerFromRawVehicle !== 'Unknown owner' ? ownerFromRawVehicle : ownerFromCleanVehicle);
 
   const candidate: TuroTripRecord = {
     rowNumber,

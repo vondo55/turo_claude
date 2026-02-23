@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import Dashboard from './components/Dashboard';
+import MultiSelectFilter from './components/MultiSelectFilter';
 import UploadZone from './components/UploadZone';
 import { parseTuroCsv } from './lib/csv';
 import { buildDashboardData } from './lib/metrics';
@@ -34,12 +35,17 @@ export default function App() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [saveToSupabase, setSaveToSupabase] = useState(false);
   const [lastFileName, setLastFileName] = useState<string | null>(null);
-  const [completedOnly, setCompletedOnly] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedOwners, setSelectedOwners] = useState<string[]>([]);
+  const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
+
+  const completedRecords = useMemo(() => {
+    return records.filter((record) => (record.status ?? '').trim().toLowerCase() === 'completed');
+  }, [records]);
 
   const monthOptions = useMemo(() => {
     const uniqueMonths = new Set(
-      records.map((record) =>
+      completedRecords.map((record) =>
         `${record.tripEnd.getFullYear()}-${String(record.tripEnd.getMonth() + 1).padStart(2, '0')}`
       )
     );
@@ -51,15 +57,22 @@ export default function App() {
         const label = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
         return { value, label };
       });
-  }, [records]);
+  }, [completedRecords]);
+
+  const ownerOptions = useMemo(() => {
+    const owners = new Set(completedRecords.map((record) => record.ownerName));
+    return Array.from(owners).sort((a, b) => a.localeCompare(b));
+  }, [completedRecords]);
+
+  const vehicleOptions = useMemo(() => {
+    const vehicles = completedRecords
+      .filter((record) => selectedOwners.length === 0 || selectedOwners.includes(record.ownerName))
+      .map((record) => record.vehicleName);
+    return Array.from(new Set(vehicles)).sort((a, b) => a.localeCompare(b));
+  }, [completedRecords, selectedOwners]);
 
   const filteredRecords = useMemo(() => {
-    return records.filter((record) => {
-      const status = (record.status ?? '').toLowerCase();
-      if (completedOnly && status !== 'completed') {
-        return false;
-      }
-
+    return completedRecords.filter((record) => {
       if (selectedMonth !== 'all') {
         const key = `${record.tripEnd.getFullYear()}-${String(record.tripEnd.getMonth() + 1).padStart(2, '0')}`;
         if (key !== selectedMonth) {
@@ -67,9 +80,17 @@ export default function App() {
         }
       }
 
+      if (selectedOwners.length > 0 && !selectedOwners.includes(record.ownerName)) {
+        return false;
+      }
+
+      if (selectedVehicles.length > 0 && !selectedVehicles.includes(record.vehicleName)) {
+        return false;
+      }
+
       return true;
     });
-  }, [completedOnly, records, selectedMonth]);
+  }, [completedRecords, selectedMonth, selectedOwners, selectedVehicles]);
 
   const data: DashboardData | null = useMemo(() => {
     if (filteredRecords.length === 0) {
@@ -109,11 +130,16 @@ export default function App() {
       const parsed = await parseTuroCsv(file);
       setRecords(parsed.records);
       setSelectedMonth('all');
+      setSelectedOwners([]);
+      setSelectedVehicles([]);
       setWarnings(parsed.warnings);
       setLastFileName(file.name);
 
       if (saveToSupabase) {
-        const dashboard = buildDashboardData(parsed.records);
+        const completedOnlyRecords = parsed.records.filter(
+          (record) => (record.status ?? '').trim().toLowerCase() === 'completed'
+        );
+        const dashboard = buildDashboardData(completedOnlyRecords);
         const result = await saveUploadToSupabase(file.name, parsed.records, dashboard);
         setInfo(
           result.duplicateUpload
@@ -175,10 +201,32 @@ export default function App() {
 
       {records.length > 0 ? (
         <section className="filter-controls">
-          <label>
-            <input type="checkbox" checked={completedOnly} onChange={(event) => setCompletedOnly(event.target.checked)} />
-            Completed trips only
-          </label>
+          <p className="filter-note">Completed trips only</p>
+          <MultiSelectFilter
+            label="Owner"
+            options={ownerOptions}
+            selectedValues={selectedOwners}
+            onChange={(nextOwners) => {
+              setSelectedOwners(nextOwners);
+              setSelectedVehicles((currentVehicles) =>
+                currentVehicles.filter((vehicle) =>
+                  completedRecords.some((record) =>
+                    nextOwners.length === 0
+                      ? record.vehicleName === vehicle
+                      : record.vehicleName === vehicle && nextOwners.includes(record.ownerName)
+                  )
+                )
+              );
+            }}
+            placeholder="All owners"
+          />
+          <MultiSelectFilter
+            label="Vehicle"
+            options={vehicleOptions}
+            selectedValues={selectedVehicles}
+            onChange={setSelectedVehicles}
+            placeholder="All vehicles"
+          />
           <label>
             Month
             <select value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>

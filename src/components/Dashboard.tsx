@@ -25,7 +25,8 @@ function currency(value: number | null): string {
   return value.toLocaleString(undefined, {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 
@@ -148,12 +149,40 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
               <p>{currency(data.metrics.totalEarnings)}</p>
             </article>
             <article className="kpi-card">
+              <h3>Total Bookings</h3>
+              <p>{data.metrics.totalBookings.toLocaleString()}</p>
+            </article>
+            <article className="kpi-card">
               <h3>LR Share</h3>
               <p>{currency(data.metrics.lrShare)}</p>
             </article>
             <article className="kpi-card">
               <h3>Owner Share</h3>
               <p>{currency(data.metrics.ownerShare)}</p>
+            </article>
+            <article className="kpi-card">
+              <h3>Total Labor Hours</h3>
+              <p>{data.metrics.totalLaborHours.toLocaleString()}</p>
+            </article>
+            <article className="kpi-card">
+              <h3>Labor Cost</h3>
+              <p>{currency(data.metrics.laborCost)}</p>
+            </article>
+            <article className="kpi-card">
+              <h3>LR Share/Labor Hour</h3>
+              <p>{currency(data.metrics.lrSharePerLaborHour)}</p>
+            </article>
+            <article className="kpi-card">
+              <h3>Labor/LR Share</h3>
+              <p>{percent(data.metrics.laborToLrSharePct)}</p>
+            </article>
+            <article className="kpi-card">
+              <h3>Avg Monthly LR Share</h3>
+              <p>{currency(data.metrics.averageMonthlyLrShare)}</p>
+            </article>
+            <article className="kpi-card">
+              <h3>LR Share/Booking</h3>
+              <p>{currency(data.metrics.lrSharePerBooking)}</p>
             </article>
             <article className="kpi-card">
               <h3>LR Split</h3>
@@ -170,6 +199,10 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
           </div>
           <p className="metric-note">
             LR/Owner shares are computed from legacy split line-items (trip price, discounts, fees, extras), not from gross revenue only.
+          </p>
+          <p className="metric-note">
+            Labor assumptions: 2 hours per booking at $15/hour. Avg Monthly LR Share is based on {data.metrics.activeMonths}{' '}
+            filtered month{data.metrics.activeMonths === 1 ? '' : 's'}.
           </p>
 
           <div className="charts-grid">
@@ -193,31 +226,52 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
             <table>
               <thead>
                 <tr>
+                  <th>Owner</th>
                   <th>Vehicle</th>
+                  <th>Bookings</th>
                   <th>Total Earnings</th>
-                  <th>Trips</th>
                   <th>LR Share</th>
                   <th>Owner Share</th>
+                  <th>Labor Hours</th>
+                  <th>Labor Cost</th>
+                  <th>LR/Labor Hr</th>
+                  <th>Labor/LR</th>
+                  <th>Avg Monthly LR</th>
+                  <th>LR/Booking</th>
                 </tr>
               </thead>
               <tbody>
                 {data.vehicleBreakdown.map((vehicle) => (
                   <tr key={vehicle.vehicle}>
+                    <td>{vehicle.ownerName}</td>
                     <td>{vehicle.vehicle}</td>
+                    <td>{vehicle.totalBookings}</td>
                     <td>{currency(vehicle.totalEarnings)}</td>
-                    <td>{vehicle.trips}</td>
                     <td>{currency(vehicle.lrShare)}</td>
                     <td>{currency(vehicle.ownerShare)}</td>
+                    <td>{vehicle.totalLaborHours}</td>
+                    <td>{currency(vehicle.laborCost)}</td>
+                    <td>{currency(vehicle.lrSharePerLaborHour)}</td>
+                    <td>{percent(vehicle.laborToLrSharePct)}</td>
+                    <td>{currency(vehicle.averageMonthlyLrShare)}</td>
+                    <td>{currency(vehicle.lrSharePerBooking)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
+                  <th>All Owners</th>
                   <th>Totals</th>
+                  <th>{data.metrics.totalBookings.toLocaleString()}</th>
                   <th>{currency(data.metrics.totalEarnings)}</th>
-                  <th>{data.metrics.totalTrips.toLocaleString()}</th>
                   <th>{currency(data.metrics.lrShare)}</th>
                   <th>{currency(data.metrics.ownerShare)}</th>
+                  <th>{data.metrics.totalLaborHours.toLocaleString()}</th>
+                  <th>{currency(data.metrics.laborCost)}</th>
+                  <th>{currency(data.metrics.lrSharePerLaborHour)}</th>
+                  <th>{percent(data.metrics.laborToLrSharePct)}</th>
+                  <th>{currency(data.metrics.averageMonthlyLrShare)}</th>
+                  <th>{currency(data.metrics.lrSharePerBooking)}</th>
                 </tr>
               </tfoot>
             </table>
@@ -237,12 +291,16 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
               <p>{percent(averageDowntime)}</p>
             </article>
             <article className="kpi-card">
-              <h3>Trips per Vehicle</h3>
+              <h3>Bookings per Vehicle</h3>
               <p>{tripsPerVehicle.toFixed(1)}</p>
             </article>
             <article className="kpi-card">
               <h3>Active Vehicles</h3>
               <p>{activeVehicles.toLocaleString()}</p>
+            </article>
+            <article className="kpi-card">
+              <h3>Total Bookings</h3>
+              <p>{data.metrics.totalBookings.toLocaleString()}</p>
             </article>
           </div>
 
@@ -279,8 +337,10 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
             <table>
               <thead>
                 <tr>
+                  <th>Owner</th>
                   <th>Vehicle</th>
-                  <th>Trips</th>
+                  <th>Bookings</th>
+                  <th>Labor Hours</th>
                   <th>Gross Revenue</th>
                   <th>Revenue per Trip</th>
                 </tr>
@@ -288,8 +348,10 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
               <tbody>
                 {data.vehiclePerformance.map((vehicle) => (
                   <tr key={vehicle.vehicle}>
+                    <td>{vehicle.ownerName}</td>
                     <td>{vehicle.vehicle}</td>
                     <td>{vehicle.tripCount}</td>
+                    <td>{vehicle.tripCount * 2}</td>
                     <td>{currency(vehicle.grossRevenue)}</td>
                     <td>{currency(vehicle.tripCount > 0 ? vehicle.grossRevenue / vehicle.tripCount : 0)}</td>
                   </tr>
