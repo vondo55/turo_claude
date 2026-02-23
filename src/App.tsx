@@ -30,6 +30,7 @@ export default function App() {
   const [records, setRecords] = useState<TuroTripRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [saveToSupabase, setSaveToSupabase] = useState(false);
   const [lastFileName, setLastFileName] = useState<string | null>(null);
@@ -77,8 +78,30 @@ export default function App() {
     return buildDashboardData(filteredRecords);
   }, [filteredRecords]);
 
+  const revenueSeries = useMemo(() => {
+    if (selectedMonth === 'all') {
+      return data?.monthlyRevenue.map((row) => ({ label: row.month, revenue: row.revenue })) ?? [];
+    }
+
+    const byDay = new Map<string, number>();
+    for (const row of filteredRecords) {
+      const key = row.tripEnd.toISOString().slice(0, 10);
+      byDay.set(key, (byDay.get(key) ?? 0) + row.grossRevenue);
+    }
+
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, revenue]) => ({
+        label: new Date(`${key}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        revenue: Number(revenue.toFixed(2)),
+      }));
+  }, [data, filteredRecords, selectedMonth]);
+
+  const revenueTitle = selectedMonth === 'all' ? 'Monthly Revenue Trend' : 'Daily Revenue Trend (Selected Month)';
+
   async function handleFile(file: File) {
     setError(null);
+    setInfo(null);
     setWarnings([]);
     setIsLoading(true);
 
@@ -91,7 +114,14 @@ export default function App() {
 
       if (saveToSupabase) {
         const dashboard = buildDashboardData(parsed.records);
-        await saveUploadToSupabase(file.name, parsed.records, dashboard);
+        const result = await saveUploadToSupabase(file.name, parsed.records, dashboard);
+        setInfo(
+          result.duplicateUpload
+            ? result.tripsRecovered
+              ? 'This file already existed in uploads. Missing trip rows were recovered.'
+              : 'This file is already stored in Supabase. Duplicate rows were skipped.'
+            : 'Saved to Supabase successfully.'
+        );
       }
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
@@ -127,6 +157,7 @@ export default function App() {
       </section>
 
       {lastFileName ? <p className="status">Latest file: {lastFileName}</p> : null}
+      {info ? <p className="status">{info}</p> : null}
 
       {error ? <p className="error">{error}</p> : null}
 
@@ -162,7 +193,11 @@ export default function App() {
         </section>
       ) : null}
 
-      {data ? <Dashboard data={data} /> : records.length > 0 ? <p className="status">No rows match current filters.</p> : null}
+      {data ? (
+        <Dashboard data={data} revenueSeries={revenueSeries} revenueTitle={revenueTitle} />
+      ) : records.length > 0 ? (
+        <p className="status">No rows match current filters.</p>
+      ) : null}
     </main>
   );
 }

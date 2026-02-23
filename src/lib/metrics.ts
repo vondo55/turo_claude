@@ -38,11 +38,20 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
 
   const revenueByMonth = new Map<string, number>();
   const bookedDaysByMonth = new Map<string, number>();
+  const activeVehiclesByMonth = new Map<string, Set<string>>();
+  const splitByMonth = new Map<string, { lrShare: number; ownerShare: number }>();
 
   for (const row of records) {
-    const key = monthKey(row.tripStart);
+    const key = monthKey(row.tripEnd);
     revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + row.grossRevenue);
     bookedDaysByMonth.set(key, (bookedDaysByMonth.get(key) ?? 0) + dayDiff(row.tripStart, row.tripEnd));
+    const vehicles = activeVehiclesByMonth.get(key) ?? new Set<string>();
+    vehicles.add(row.vehicleName);
+    activeVehiclesByMonth.set(key, vehicles);
+    const splitCurrent = splitByMonth.get(key) ?? { lrShare: 0, ownerShare: 0 };
+    splitCurrent.lrShare += row.lrShare;
+    splitCurrent.ownerShare += row.ownerShare;
+    splitByMonth.set(key, splitCurrent);
   }
 
   const monthlyRevenue = Array.from(revenueByMonth.entries())
@@ -53,9 +62,19 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, bookedDays]) => {
       const [year, month] = key.split('-').map(Number);
-      const pct = (bookedDays / daysInMonth(year, month - 1)) * 100;
+      const activeVehicles = Math.max(1, activeVehiclesByMonth.get(key)?.size ?? 1);
+      const monthCapacityDays = daysInMonth(year, month - 1) * activeVehicles;
+      const pct = (bookedDays / monthCapacityDays) * 100;
       return { month: monthLabel(key), utilizationPct: Number(Math.min(pct, 100).toFixed(1)) };
     });
+
+  const monthlySplit = Array.from(splitByMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => ({
+      month: monthLabel(key),
+      lrShare: Number(value.lrShare.toFixed(2)),
+      ownerShare: Number(value.ownerShare.toFixed(2)),
+    }));
 
   const vehicleMap = new Map<string, { grossRevenue: number; tripCount: number }>();
   for (const row of records) {
@@ -107,11 +126,8 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
     },
     monthlyRevenue,
     monthlyUtilization,
+    monthlySplit,
     vehicleBreakdown,
     vehiclePerformance,
-    cancellationBreakdown: [
-      { name: 'Completed', value: Math.max(0, totalTrips - cancelledCount) },
-      { name: 'Cancelled', value: cancelledCount },
-    ],
   };
 }

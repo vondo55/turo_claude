@@ -25,6 +25,18 @@ create table if not exists public.trips (
   status text
 );
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'trips_upload_row_unique'
+  ) then
+    alter table public.trips
+      add constraint trips_upload_row_unique unique (upload_id, row_number);
+  end if;
+end $$;
+
 alter table public.uploads enable row level security;
 alter table public.trips enable row level security;
 

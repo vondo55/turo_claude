@@ -40,7 +40,7 @@ export type DashboardData = {
   metrics: DashboardMetrics;
   monthlyRevenue: Array<{ month: string; revenue: number }>;
   monthlyUtilization: Array<{ month: string; utilizationPct: number }>;
+  monthlySplit: Array<{ month: string; lrShare: number; ownerShare: number }>;
   vehicleBreakdown: VehicleBreakdown[];
   vehiclePerformance: Array<{ vehicle: string; grossRevenue: number; tripCount: number }>;
-  cancellationBreakdown: Array<{ name: string; value: number }>;
 };

@@ -124,6 +124,35 @@ body {
   gap: 0.8rem;
 }
 
+.dashboard-tabs {
+  margin-top: 1.2rem;
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  border: 1px solid #bcccdc;
+  background: #ffffffd4;
+  color: #334e68;
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.tab-button:hover {
+  border-color: #829ab1;
+  background: #ffffff;
+}
+
+.tab-button.active {
+  background: #0b6e4f;
+  border-color: #0b6e4f;
+  color: #fff;
+}
+
 .kpi-card,
 .chart-card,
 .table-card {
@@ -145,6 +174,12 @@ body {
   font-weight: 700;
 }
 
+.metric-note {
+  margin: 0.7rem 0 0;
+  color: #486581;
+  font-size: 0.92rem;
+}
+
 .charts-grid {
   margin-top: 0.8rem;
   display: grid;
@@ -154,6 +189,7 @@ body {
 
 .table-card {
   margin-top: 0.8rem;
+  overflow-x: auto;
 }
 
 table {
@@ -176,5 +212,14 @@ tfoot th {
 @media (max-width: 640px) {
   .upload-zone {
     padding: 1.3rem;
+  }
+
+  .dashboard-tabs {
+    gap: 0.4rem;
+  }
+
+  .tab-button {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.7rem;
   }
 }
