@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import type { DashboardData, TuroTripRecord } from './types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -19,6 +20,31 @@ type SupabaseErrorLike = {
 type SaveUploadResult = {
   duplicateUpload: boolean;
 };
+
+export type UploadHistoryItem = {
+  id: string;
+  createdAt: string;
+  fileName: string;
+  totalTrips: number;
+  grossRevenue: number;
+  netEarnings: number | null;
+  cancellationRate: number;
+};
+
+type HistoricalTripRow = {
+  upload_id: string;
+  row_number: number;
+  trip_end: string;
+  status: string | null;
+  gross_revenue: number;
+};
+
+type ExistingTripStatusRow = {
+  trip_fingerprint: string;
+  status: string | null;
+};
+
+type AuthStateCallback = (event: string, session: Session | null) => void;
 
 function formatSupabaseError(error: SupabaseErrorLike, fallback: string) {
   const parts = [error.message, error.details, error.hint].filter(Boolean);
@@ -47,6 +73,58 @@ function buildUploadIdFromFileHash(fileHashHex: string) {
   return formatUuidFromBytes(bytes);
 }
 
+function buildUploadIdFromUserScopedFileHash(userId: string, fileHashHex: string) {
+  const userHashHex = userId.replace(/-/g, '').toLowerCase();
+  if (!/^[a-f0-9]{32}$/.test(userHashHex)) {
+    throw new Error('Invalid user id format for upload key derivation.');
+  }
+  return buildUploadIdFromFileHash(`${userHashHex}${fileHashHex.slice(32)}`);
+}
+
+function normalizeFingerprintValue(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isCompletedStatus(status: string | null | undefined) {
+  return (status ?? '').trim().toLowerCase() === 'completed';
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function buildTripFingerprint(row: TuroTripRecord) {
+  const identityGuest = row.guestName === 'Unknown guest' ? row.ownerName : row.guestName;
+  const fingerprintBase = [
+    normalizeFingerprintValue(row.vehicleName),
+    normalizeFingerprintValue(identityGuest),
+    row.tripStart.toISOString(),
+    row.tripEnd.toISOString(),
+  ].join('|');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fingerprintBase));
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function getCurrentUserId() {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
+  }
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to get authenticated user.'));
+  }
+  if (!data.user) {
+    throw new Error('You must sign in before using Supabase persistence.');
+  }
+  return data.user.id;
+}
+
 export async function saveUploadToSupabase(
   fileName: string,
   records: TuroTripRecord[],
@@ -59,7 +137,8 @@ export async function saveUploadToSupabase(
     );
   }
 
-  const uploadId = buildUploadIdFromFileHash(fileHashHex);
+  const userId = await getCurrentUserId();
+  const uploadId = buildUploadIdFromUserScopedFileHash(userId, fileHashHex);
 
   const { error: uploadError } = await supabase
     .from('uploads')
@@ -79,28 +158,186 @@ export async function saveUploadToSupabase(
     }
   }
 
-  const payload = records.map((row) => ({
+  const tripFingerprints = await Promise.all(records.map((row) => buildTripFingerprint(row)));
+  const rowsWithFingerprints = records.map((row, index) => ({ ...row, tripFingerprint: tripFingerprints[index] }));
+
+  const existingStatuses: ExistingTripStatusRow[] = [];
+  const fingerprintChunks = chunk(tripFingerprints, 200);
+  for (const fingerprintChunk of fingerprintChunks) {
+    const { data, error } = await supabase
+      .from('trips')
+      .select('trip_fingerprint, status')
+      .in('trip_fingerprint', fingerprintChunk)
+      .returns<ExistingTripStatusRow[]>();
+
+    if (error) {
+      throw new Error(formatSupabaseError(error, 'Failed to evaluate existing trip statuses.'));
+    }
+    if (data) {
+      existingStatuses.push(...data);
+    }
+  }
+
+  const completedFingerprints = new Set(
+    (existingStatuses ?? []).filter((row) => isCompletedStatus(row.status)).map((row) => row.trip_fingerprint)
+  );
+
+  const upsertRows = rowsWithFingerprints.filter((entry) => !completedFingerprints.has(entry.tripFingerprint));
+
+  if (upsertRows.length === 0) {
+    return { duplicateUpload };
+  }
+
+  const dedupedByFingerprint = new Map<string, (typeof upsertRows)[number]>();
+  for (const row of upsertRows) {
+    const current = dedupedByFingerprint.get(row.tripFingerprint);
+    if (!current) {
+      dedupedByFingerprint.set(row.tripFingerprint, row);
+      continue;
+    }
+
+    if (isCompletedStatus(row.status) && !isCompletedStatus(current.status)) {
+      dedupedByFingerprint.set(row.tripFingerprint, row);
+      continue;
+    }
+
+    if (row.rowNumber > current.rowNumber) {
+      dedupedByFingerprint.set(row.tripFingerprint, row);
+    }
+  }
+
+  const dedupedRows = Array.from(dedupedByFingerprint.values());
+
+  const tripsPayload = dedupedRows.map((entry) => ({
+    user_id: userId,
     upload_id: uploadId,
-    row_number: row.rowNumber,
-    trip_start: row.tripStart.toISOString(),
-    trip_end: row.tripEnd.toISOString(),
-    vehicle_name: row.vehicleName,
-    gross_revenue: row.grossRevenue,
-    net_earnings: row.netEarnings,
-    addons_revenue: row.addonsRevenue,
-    is_cancelled: row.isCancelled,
-    status: row.status,
+    row_number: entry.rowNumber,
+    trip_start: entry.tripStart.toISOString(),
+    trip_end: entry.tripEnd.toISOString(),
+    vehicle_name: entry.vehicleName,
+    guest_name: entry.guestName,
+    gross_revenue: entry.grossRevenue,
+    net_earnings: entry.netEarnings,
+    addons_revenue: entry.addonsRevenue,
+    is_cancelled: entry.isCancelled,
+    status: entry.status,
+    trip_fingerprint: entry.tripFingerprint,
   }));
 
-  if (duplicateUpload) {
-    return { duplicateUpload: true };
+  const payloadChunks = chunk(tripsPayload, 200);
+  for (const payloadChunk of payloadChunks) {
+    const { error: tripsError } = await supabase.from('trips').upsert(payloadChunk, {
+      onConflict: 'user_id,trip_fingerprint',
+    });
+
+    if (tripsError) {
+      throw new Error(formatSupabaseError(tripsError, 'Failed to insert trip rows.'));
+    }
   }
 
-  const { error: tripsError } = await supabase.from('trips').insert(payload);
+  return { duplicateUpload };
+}
 
-  if (tripsError) {
-    throw new Error(formatSupabaseError(tripsError, 'Failed to insert trip rows.'));
+export async function signInWithEmail(email: string, password: string) {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
+  }
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to sign in.'));
+  }
+}
+
+export async function signOutFromSupabase() {
+  if (!supabase) {
+    return;
+  }
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to sign out.'));
+  }
+}
+
+export async function getSupabaseSession() {
+  if (!supabase) {
+    return null;
+  }
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to load auth session.'));
+  }
+  return data.session;
+}
+
+export function onSupabaseAuthStateChange(callback: AuthStateCallback) {
+  if (!supabase) {
+    return () => {};
+  }
+  const { data } = supabase.auth.onAuthStateChange(callback);
+  return () => data.subscription.unsubscribe();
+}
+
+export async function getUploadHistory(limit = 25): Promise<UploadHistoryItem[]> {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
   }
 
-  return { duplicateUpload: false };
+  const { data, error } = await supabase
+    .from('uploads')
+    .select('id, created_at, file_name, total_trips, gross_revenue, net_earnings, cancellation_rate')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to load upload history.'));
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    createdAt: row.created_at as string,
+    fileName: row.file_name as string,
+    totalTrips: row.total_trips as number,
+    grossRevenue: Number(row.gross_revenue),
+    netEarnings: row.net_earnings === null ? null : Number(row.net_earnings),
+    cancellationRate: Number(row.cancellation_rate),
+  }));
+}
+
+export async function getHistoricalRevenueSeries(uploadId: string): Promise<Array<{ label: string; revenue: number }>> {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('trips')
+    .select('upload_id, row_number, trip_end, gross_revenue, status')
+    .eq('upload_id', uploadId)
+    .order('row_number', { ascending: true })
+    .returns<HistoricalTripRow[]>();
+
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to load historical trip rows.'));
+  }
+
+  const revenueByDay = new Map<string, number>();
+  for (const row of data ?? []) {
+    if (!isCompletedStatus(row.status)) {
+      continue;
+    }
+    const dayKey = row.trip_end.slice(0, 10);
+    revenueByDay.set(dayKey, (revenueByDay.get(dayKey) ?? 0) + Number(row.gross_revenue));
+  }
+
+  return Array.from(revenueByDay.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dayKey, revenue]) => ({
+      label: new Date(`${dayKey}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      revenue: Number(revenue.toFixed(2)),
+    }));
 }

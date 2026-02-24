@@ -1,11 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Dashboard from './components/Dashboard';
 import MultiSelectFilter from './components/MultiSelectFilter';
 import UploadZone from './components/UploadZone';
 import { parseTuroCsv } from './lib/csv';
 import { buildDashboardData } from './lib/metrics';
-import { saveUploadToSupabase, supabase } from './lib/supabase';
+import {
+  getHistoricalRevenueSeries,
+  getSupabaseSession,
+  getUploadHistory,
+  onSupabaseAuthStateChange,
+  saveUploadToSupabase,
+  signInWithEmail,
+  signOutFromSupabase,
+  supabase,
+} from './lib/supabase';
 import type { DashboardData, TuroTripRecord } from './lib/types';
+import type { UploadHistoryItem } from './lib/supabase';
 
 function getErrorMessage(caughtError: unknown) {
   if (caughtError instanceof Error) {
@@ -32,6 +44,16 @@ async function computeFileSha256Hex(file: File) {
   return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
+function currency(value: number | null): string {
+  if (value === null) return 'N/A';
+  return value.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export default function App() {
   const [records, setRecords] = useState<TuroTripRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +65,17 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedOwners, setSelectedOwners] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
+  const [dataSource, setDataSource] = useState<'currentUpload' | 'supabaseHistory'>('currentUpload');
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [uploadHistory, setUploadHistory] = useState<UploadHistoryItem[]>([]);
+  const [selectedHistoryUploadId, setSelectedHistoryUploadId] = useState<string | null>(null);
+  const [historicalRevenueSeries, setHistoricalRevenueSeries] = useState<Array<{ label: string; revenue: number }>>([]);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const completedRecords = useMemo(() => {
     return records.filter((record) => (record.status ?? '').trim().toLowerCase() === 'completed');
@@ -124,6 +157,120 @@ export default function App() {
   }, [data, filteredRecords, selectedMonth]);
 
   const revenueTitle = selectedMonth === 'all' ? 'Monthly Revenue Trend' : 'Daily Revenue Trend (Selected Month)';
+  const isSignedIn = Boolean(session);
+  const supabaseModeMessage = !supabase
+    ? 'Supabase not configured yet. Local dashboard mode still works.'
+    : !isSignedIn
+      ? 'Sign in to enable Supabase save/history. Uploads currently run in local-only mode.'
+      : saveToSupabase
+        ? 'Supabase save is enabled for new uploads.'
+        : 'Supabase save is off. New uploads will be local-only unless you check the box.';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSession() {
+      if (!supabase) return;
+      try {
+        const currentSession = await getSupabaseSession();
+        if (!cancelled) {
+          setSession(currentSession);
+        }
+      } catch (caughtError) {
+        if (!cancelled) {
+          setAuthError(getErrorMessage(caughtError));
+        }
+      }
+    }
+
+    void loadSession();
+    const unsubscribe = onSupabaseAuthStateChange((event, nextSession) => {
+      setSession(nextSession);
+      setAuthError(null);
+      if (event === 'SIGNED_IN') {
+        setSaveToSupabase(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isSignedIn) {
+      return;
+    }
+    setSaveToSupabase(false);
+    if (dataSource === 'supabaseHistory') {
+      setDataSource('currentUpload');
+    }
+  }, [dataSource, isSignedIn]);
+
+  useEffect(() => {
+    if (dataSource !== 'supabaseHistory' || !supabase || !isSignedIn) {
+      return;
+    }
+
+    let cancelled = false;
+    async function loadHistory() {
+      setHistoryError(null);
+      setHistoryLoading(true);
+      try {
+        const uploads = await getUploadHistory(40);
+        if (cancelled) return;
+        setUploadHistory(uploads);
+        setSelectedHistoryUploadId((current) => current ?? uploads[0]?.id ?? null);
+      } catch (caughtError) {
+        if (!cancelled) {
+          setHistoryError(getErrorMessage(caughtError));
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    void loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, isSignedIn]);
+
+  useEffect(() => {
+    if (dataSource !== 'supabaseHistory' || !selectedHistoryUploadId || !supabase || !isSignedIn) {
+      setHistoricalRevenueSeries([]);
+      return;
+    }
+    const uploadId = selectedHistoryUploadId;
+
+    let cancelled = false;
+    async function loadRevenueSeries() {
+      setHistoryError(null);
+      setHistoryLoading(true);
+      try {
+        const series = await getHistoricalRevenueSeries(uploadId);
+        if (!cancelled) {
+          setHistoricalRevenueSeries(series);
+        }
+      } catch (caughtError) {
+        if (!cancelled) {
+          setHistoryError(getErrorMessage(caughtError));
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    void loadRevenueSeries();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, isSignedIn, selectedHistoryUploadId]);
 
   async function handleFile(file: File) {
     setError(null);
@@ -141,6 +288,9 @@ export default function App() {
       setLastFileName(file.name);
 
       if (saveToSupabase) {
+        if (!isSignedIn) {
+          throw new Error('Sign in to save uploads to Supabase.');
+        }
         const completedOnlyRecords = parsed.records.filter(
           (record) => (record.status ?? '').trim().toLowerCase() === 'completed'
         );
@@ -152,6 +302,8 @@ export default function App() {
             ? 'This exact file is already stored in Supabase. Duplicate rows were skipped.'
             : 'Saved to Supabase successfully.'
         );
+      } else {
+        setInfo('CSV processed locally only. Turn on "Save this upload to Supabase" to persist rows.');
       }
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
@@ -168,22 +320,111 @@ export default function App() {
         <p className="subhead">Upload raw Turo export data and get KPI + trend insights immediately.</p>
       </header>
 
+      {supabase ? (
+        <section className="auth-panel">
+          <h2>Supabase Access</h2>
+          {isSignedIn ? (
+            <div className="auth-signed-in">
+              <p>Signed in as {session?.user.email}</p>
+              <button
+                type="button"
+                onClick={async () => {
+                  setAuthError(null);
+                  setAuthLoading(true);
+                  try {
+                    await signOutFromSupabase();
+                    setInfo('Signed out. Local CSV mode is still available.');
+                  } catch (caughtError) {
+                    setAuthError(getErrorMessage(caughtError));
+                  } finally {
+                    setAuthLoading(false);
+                  }
+                }}
+                disabled={authLoading}
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <form
+              className="auth-form"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setAuthError(null);
+                setAuthLoading(true);
+                try {
+                  await signInWithEmail(authEmail.trim(), authPassword);
+                  setInfo('Signed in. You can now save uploads and view Supabase history.');
+                  setAuthPassword('');
+                } catch (caughtError) {
+                  setAuthError(getErrorMessage(caughtError));
+                } finally {
+                  setAuthLoading(false);
+                }
+              }}
+            >
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+              <button type="submit" disabled={authLoading}>
+                {authLoading ? 'Signing in...' : 'Sign in'}
+              </button>
+            </form>
+          )}
+          {authError ? <p className="error">{authError}</p> : null}
+          {!isSignedIn ? <small>Sign in is required for Supabase save/history. Local CSV analysis remains available.</small> : null}
+        </section>
+      ) : null}
+
       <UploadZone onFileSelected={handleFile} isLoading={isLoading} />
 
       <section className="controls">
         <label>
           <input
+            type="radio"
+            name="dataSource"
+            checked={dataSource === 'currentUpload'}
+            onChange={() => setDataSource('currentUpload')}
+          />
+          Current upload mode
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="dataSource"
+            checked={dataSource === 'supabaseHistory'}
+            onChange={() => setDataSource('supabaseHistory')}
+            disabled={!supabase || !isSignedIn}
+          />
+          Supabase history mode
+        </label>
+        <label>
+          <input
             type="checkbox"
             checked={saveToSupabase}
             onChange={(event) => setSaveToSupabase(event.target.checked)}
+            disabled={!isSignedIn}
           />
           Save this upload to Supabase
         </label>
-        <small>
-          {supabase
-            ? 'Supabase is configured from environment variables.'
-            : 'Supabase not configured yet. Local dashboard mode still works.'}
-        </small>
+        <small>{supabaseModeMessage}</small>
       </section>
 
       {lastFileName ? <p className="status">Latest file: {lastFileName}</p> : null}
@@ -203,7 +444,81 @@ export default function App() {
         </section>
       ) : null}
 
-      {records.length > 0 ? (
+      {dataSource === 'supabaseHistory' ? (
+        <section className="history-panel">
+          <div className="history-header">
+            <h2>Historical Uploads</h2>
+            <button
+              type="button"
+              onClick={async () => {
+                setHistoryError(null);
+                setHistoryLoading(true);
+                try {
+                  const uploads = await getUploadHistory(40);
+                  setUploadHistory(uploads);
+                  setSelectedHistoryUploadId((current) => current ?? uploads[0]?.id ?? null);
+                } catch (caughtError) {
+                  setHistoryError(getErrorMessage(caughtError));
+                } finally {
+                  setHistoryLoading(false);
+                }
+              }}
+              disabled={!supabase || historyLoading}
+            >
+              Refresh history
+            </button>
+          </div>
+
+          {historyError ? <p className="error">{historyError}</p> : null}
+          {historyLoading ? <p className="status">Loading historical data...</p> : null}
+
+          <div className="history-grid">
+            <article className="table-card">
+              <h3>Uploads</h3>
+              {uploadHistory.length === 0 ? (
+                <p className="status">No uploads found.</p>
+              ) : (
+                <ul className="history-upload-list">
+                  {uploadHistory.map((upload) => (
+                    <li key={upload.id}>
+                      <button
+                        type="button"
+                        className={selectedHistoryUploadId === upload.id ? 'history-upload-button active' : 'history-upload-button'}
+                        onClick={() => setSelectedHistoryUploadId(upload.id)}
+                      >
+                        <span>{upload.fileName}</span>
+                        <small>
+                          {new Date(upload.createdAt).toLocaleString()} | Trips: {upload.totalTrips} | Gross:{' '}
+                          {currency(upload.grossRevenue)}
+                        </small>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+
+            <article className="chart-card">
+              <h3>Historical Daily Revenue</h3>
+              {historicalRevenueSeries.length === 0 ? (
+                <p className="status">Select an upload to view its stored trip revenue trend.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={historicalRevenueSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="revenue" stroke="#0b6e4f" strokeWidth={3} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </article>
+          </div>
+        </section>
+      ) : null}
+
+      {dataSource === 'currentUpload' && records.length > 0 ? (
         <section className="filter-controls">
           <p className="filter-note">Completed trips only</p>
           <MultiSelectFilter
@@ -245,9 +560,9 @@ export default function App() {
         </section>
       ) : null}
 
-      {data ? (
+      {dataSource === 'currentUpload' && data ? (
         <Dashboard data={data} revenueSeries={revenueSeries} revenueTitle={revenueTitle} />
-      ) : records.length > 0 ? (
+      ) : dataSource === 'currentUpload' && records.length > 0 ? (
         <p className="status">No rows match current filters.</p>
       ) : null}
     </main>

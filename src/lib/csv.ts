@@ -15,6 +15,9 @@ type ColumnMap = {
   ownerName?: string;
   ownerFirstName?: string;
   ownerLastName?: string;
+  guestName?: string;
+  guestFirstName?: string;
+  guestLastName?: string;
   status?: string;
   isCancelled?: string;
   splitItemColumns: Partial<Record<SplitItem, string>>;
@@ -63,6 +66,7 @@ const recordSchema = z.object({
   tripEnd: z.date(),
   vehicleName: z.string(),
   ownerName: z.string(),
+  guestName: z.string(),
   grossRevenue: z.number().finite(),
   netEarnings: z.number().finite().nullable(),
   addonsRevenue: z.number().finite().nullable(),
@@ -93,6 +97,9 @@ const aliases = {
   ],
   ownerFirstName: ['ownerfirstname', 'hostfirstname', 'firstname'],
   ownerLastName: ['ownerlastname', 'hostlastname', 'lastname'],
+  guestName: ['guest', 'guestname', 'customer', 'customername', 'renter', 'rentername'],
+  guestFirstName: ['guestfirstname', 'renterfirstname', 'customerfirstname', 'guestfirst'],
+  guestLastName: ['guestlastname', 'renterlastname', 'customerlastname', 'guestlast'],
   status: ['tripstatus', 'status', 'reservationstatus'],
   isCancelled: ['cancelled', 'iscancelled', 'canceled', 'iscanceled'],
 };
@@ -138,6 +145,9 @@ function buildColumnMap(headers: string[]): ColumnMap {
     ownerName: findColumn(headers, aliases.ownerName),
     ownerFirstName: findColumn(headers, aliases.ownerFirstName),
     ownerLastName: findColumn(headers, aliases.ownerLastName),
+    guestName: findColumn(headers, aliases.guestName),
+    guestFirstName: findColumn(headers, aliases.guestFirstName),
+    guestLastName: findColumn(headers, aliases.guestLastName),
     status: findColumn(headers, aliases.status),
     isCancelled: findColumn(headers, aliases.isCancelled),
     splitItemColumns: buildSplitItemColumns(headers),
@@ -324,6 +334,11 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     ownerFromParts ||
     ownerFromVehicleColumns ||
     (ownerFromRawVehicle !== 'Unknown owner' ? ownerFromRawVehicle : ownerFromCleanVehicle);
+  const guestNameFromColumn = map.guestName ? String(raw[map.guestName] ?? '').trim() : '';
+  const guestFirst = map.guestFirstName ? String(raw[map.guestFirstName] ?? '').trim() : '';
+  const guestLast = map.guestLastName ? String(raw[map.guestLastName] ?? '').trim() : '';
+  const guestNameFromParts = [guestFirst, guestLast].filter(Boolean).join(' ').trim();
+  const guestName = guestNameFromColumn || guestNameFromParts || 'Unknown guest';
 
   const candidate: TuroTripRecord = {
     rowNumber,
@@ -331,6 +346,7 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     tripEnd: end,
     vehicleName,
     ownerName,
+    guestName,
     grossRevenue: gross,
     netEarnings: map.netEarnings ? parseMoney(raw[map.netEarnings]) : null,
     addonsRevenue: map.addonsRevenue ? parseMoney(raw[map.addonsRevenue]) : null,

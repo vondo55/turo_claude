@@ -45,6 +45,58 @@ body {
   text-align: center;
 }
 
+.auth-panel {
+  margin-top: 1rem;
+  background: #ffffffde;
+  border-radius: 12px;
+  padding: 0.9rem;
+  box-shadow: 0 2px 18px rgba(16, 42, 67, 0.08);
+}
+
+.auth-panel h2 {
+  margin: 0 0 0.55rem;
+  font-size: 1.05rem;
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.auth-form input {
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  padding: 0.5rem 0.55rem;
+}
+
+.auth-form button,
+.auth-signed-in button {
+  width: fit-content;
+  background: #0b6e4f;
+  color: #fff;
+  border: 0;
+  border-radius: 9px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+.auth-signed-in {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.auth-signed-in p {
+  margin: 0;
+}
+
 .upload-zone.dragging {
   border-color: #1f8a70;
   background: #dff6ef;
@@ -73,6 +125,16 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.controls input[type='radio'] {
+  accent-color: #0b6e4f;
 }
 
 .filter-controls {
@@ -251,6 +313,76 @@ body {
   box-shadow: 0 2px 18px rgba(16, 42, 67, 0.08);
 }
 
+.history-panel {
+  margin-top: 1rem;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.history-header h2 {
+  margin: 0;
+}
+
+.history-header button {
+  background: #0b6e4f;
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+}
+
+.history-header button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.history-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: minmax(260px, 380px) minmax(320px, 1fr);
+  gap: 0.8rem;
+}
+
+.history-upload-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.history-upload-button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #d9e2ec;
+  background: #fff;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+}
+
+.history-upload-button span {
+  display: block;
+  font-weight: 600;
+  color: #102a43;
+}
+
+.history-upload-button small {
+  color: #627d98;
+}
+
+.history-upload-button.active {
+  border-color: #0b6e4f;
+  background: #eef9f4;
+}
+
 .kpi-card h3,
 .chart-card h3,
 .table-card h3 {
@@ -319,5 +451,9 @@ tfoot th {
 
   .multi-select-panel {
     width: 100%;
+  }
+
+  .history-grid {
+    grid-template-columns: 1fr;
   }
 }

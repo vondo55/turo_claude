@@ -4,6 +4,7 @@ export type TuroTripRecord = {
   tripEnd: Date;
   vehicleName: string;
   ownerName: string;
+  guestName: string;
   grossRevenue: number;
   netEarnings: number | null;
   addonsRevenue: number | null;
