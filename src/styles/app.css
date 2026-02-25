@@ -395,6 +395,15 @@ body {
   font-weight: 700;
 }
 
+.kpi-card.subtle {
+  border: 1px solid #d9e2ec;
+}
+
+.kpi-card.alert {
+  border: 1px solid #f4a100;
+  background: #fff8e8;
+}
+
 .metric-note {
   margin: 0.7rem 0 0;
   color: #486581;

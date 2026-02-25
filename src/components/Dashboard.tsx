@@ -49,6 +49,7 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
   const lrSharePct = data.metrics.totalEarnings > 0 ? (data.metrics.lrShare / data.metrics.totalEarnings) * 100 : 0;
   const ownerSharePct = data.metrics.totalEarnings > 0 ? (data.metrics.ownerShare / data.metrics.totalEarnings) * 100 : 0;
   const reconciliationGap = data.metrics.totalEarnings - (data.metrics.lrShare + data.metrics.ownerShare);
+  const hasReconciliationGap = Math.abs(reconciliationGap) > 0.01;
 
   return (
     <section className="dashboard">
@@ -161,30 +162,6 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
               <p>{currency(data.metrics.ownerShare)}</p>
             </article>
             <article className="kpi-card">
-              <h3>Total Labor Hours</h3>
-              <p>{data.metrics.totalLaborHours.toLocaleString()}</p>
-            </article>
-            <article className="kpi-card">
-              <h3>Labor Cost</h3>
-              <p>{currency(data.metrics.laborCost)}</p>
-            </article>
-            <article className="kpi-card">
-              <h3>LR Share/Labor Hour</h3>
-              <p>{currency(data.metrics.lrSharePerLaborHour)}</p>
-            </article>
-            <article className="kpi-card">
-              <h3>Labor/LR Share</h3>
-              <p>{percent(data.metrics.laborToLrSharePct)}</p>
-            </article>
-            <article className="kpi-card">
-              <h3>Avg Monthly LR Share</h3>
-              <p>{currency(data.metrics.averageMonthlyLrShare)}</p>
-            </article>
-            <article className="kpi-card">
-              <h3>LR Share/Booking</h3>
-              <p>{currency(data.metrics.lrSharePerBooking)}</p>
-            </article>
-            <article className="kpi-card">
               <h3>LR Split</h3>
               <p>{percent(lrSharePct)}</p>
             </article>
@@ -192,7 +169,7 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
               <h3>Owner Split</h3>
               <p>{percent(ownerSharePct)}</p>
             </article>
-            <article className="kpi-card">
+            <article className={`kpi-card ${hasReconciliationGap ? 'alert' : 'subtle'}`}>
               <h3>Reconciliation Gap</h3>
               <p>{currency(reconciliationGap)}</p>
             </article>
@@ -200,29 +177,9 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
           <p className="metric-note">
             LR/Owner shares are computed from legacy split line-items (trip price, discounts, fees, extras), not from gross revenue only.
           </p>
-          <p className="metric-note">
-            Labor assumptions: 2 hours per booking at $15/hour. Avg Monthly LR Share is based on {data.metrics.activeMonths}{' '}
-            filtered month{data.metrics.activeMonths === 1 ? '' : 's'}.
-          </p>
-
-          <div className="charts-grid">
-            <article className="chart-card">
-              <h3>Monthly LR vs Owner Share</h3>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={data.monthlySplit}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="lrShare" fill="#457b9d" name="LR Share" />
-                  <Bar dataKey="ownerShare" fill="#1f8a70" name="Owner Share" />
-                </BarChart>
-              </ResponsiveContainer>
-            </article>
-          </div>
 
           <article className="table-card">
-            <h3>Vehicle Earnings Reconciliation</h3>
+            <h3>Owner Economics by Vehicle</h3>
             <table>
               <thead>
                 <tr>
@@ -232,12 +189,6 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
                   <th>Total Earnings</th>
                   <th>LR Share</th>
                   <th>Owner Share</th>
-                  <th>Labor Hours</th>
-                  <th>Labor Cost</th>
-                  <th>LR/Labor Hr</th>
-                  <th>Labor/LR</th>
-                  <th>Avg Monthly LR</th>
-                  <th>LR/Booking</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,12 +200,6 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
                     <td>{currency(vehicle.totalEarnings)}</td>
                     <td>{currency(vehicle.lrShare)}</td>
                     <td>{currency(vehicle.ownerShare)}</td>
-                    <td>{vehicle.totalLaborHours}</td>
-                    <td>{currency(vehicle.laborCost)}</td>
-                    <td>{currency(vehicle.lrSharePerLaborHour)}</td>
-                    <td>{percent(vehicle.laborToLrSharePct)}</td>
-                    <td>{currency(vehicle.averageMonthlyLrShare)}</td>
-                    <td>{currency(vehicle.lrSharePerBooking)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -266,12 +211,6 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
                   <th>{currency(data.metrics.totalEarnings)}</th>
                   <th>{currency(data.metrics.lrShare)}</th>
                   <th>{currency(data.metrics.ownerShare)}</th>
-                  <th>{data.metrics.totalLaborHours.toLocaleString()}</th>
-                  <th>{currency(data.metrics.laborCost)}</th>
-                  <th>{currency(data.metrics.lrSharePerLaborHour)}</th>
-                  <th>{percent(data.metrics.laborToLrSharePct)}</th>
-                  <th>{currency(data.metrics.averageMonthlyLrShare)}</th>
-                  <th>{currency(data.metrics.lrSharePerBooking)}</th>
                 </tr>
               </tfoot>
             </table>
