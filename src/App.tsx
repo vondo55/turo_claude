@@ -19,6 +19,8 @@ import {
 import type { DashboardData, TuroTripRecord } from './lib/types';
 import type { UploadHistoryItem } from './lib/supabase';
 
+type AnalysisMode = 'ops' | 'accounting';
+
 function getErrorMessage(caughtError: unknown) {
   if (caughtError instanceof Error) {
     return caughtError.message;
@@ -54,6 +56,10 @@ function currency(value: number | null): string {
   });
 }
 
+function isCompletedTrip(record: TuroTripRecord): boolean {
+  return (record.status ?? '').trim().toLowerCase() === 'completed';
+}
+
 export default function App() {
   const [records, setRecords] = useState<TuroTripRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +71,7 @@ export default function App() {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedOwners, setSelectedOwners] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('ops');
   const [dataSource, setDataSource] = useState<'currentUpload' | 'supabaseHistory'>('currentUpload');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -77,13 +84,16 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const completedRecords = useMemo(() => {
-    return records.filter((record) => (record.status ?? '').trim().toLowerCase() === 'completed');
-  }, [records]);
+  const modeRecords = useMemo(() => {
+    if (analysisMode === 'ops') {
+      return records.filter(isCompletedTrip);
+    }
+    return records;
+  }, [analysisMode, records]);
 
   const monthOptions = useMemo(() => {
     const uniqueMonths = new Set(
-      completedRecords.map((record) =>
+      modeRecords.map((record) =>
         `${record.tripEnd.getFullYear()}-${String(record.tripEnd.getMonth() + 1).padStart(2, '0')}`
       )
     );
@@ -95,22 +105,22 @@ export default function App() {
         const label = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
         return { value, label };
       });
-  }, [completedRecords]);
+  }, [modeRecords]);
 
   const ownerOptions = useMemo(() => {
-    const owners = new Set(completedRecords.map((record) => record.ownerName));
+    const owners = new Set(modeRecords.map((record) => record.ownerName));
     return Array.from(owners).sort((a, b) => a.localeCompare(b));
-  }, [completedRecords]);
+  }, [modeRecords]);
 
   const vehicleOptions = useMemo(() => {
-    const vehicles = completedRecords
+    const vehicles = modeRecords
       .filter((record) => selectedOwners.length === 0 || selectedOwners.includes(record.ownerName))
       .map((record) => record.vehicleName);
     return Array.from(new Set(vehicles)).sort((a, b) => a.localeCompare(b));
-  }, [completedRecords, selectedOwners]);
+  }, [modeRecords, selectedOwners]);
 
   const filteredRecords = useMemo(() => {
-    return completedRecords.filter((record) => {
+    return modeRecords.filter((record) => {
       if (selectedMonth !== 'all') {
         const key = `${record.tripEnd.getFullYear()}-${String(record.tripEnd.getMonth() + 1).padStart(2, '0')}`;
         if (key !== selectedMonth) {
@@ -128,14 +138,25 @@ export default function App() {
 
       return true;
     });
-  }, [completedRecords, selectedMonth, selectedOwners, selectedVehicles]);
+  }, [modeRecords, selectedMonth, selectedOwners, selectedVehicles]);
+
+  const recordsForMetrics = useMemo(() => {
+    if (analysisMode === 'ops') {
+      return filteredRecords;
+    }
+    return filteredRecords.map((record) => ({
+      ...record,
+      lrShare: record.legacyLrShare,
+      ownerShare: record.legacyOwnerShare,
+    }));
+  }, [analysisMode, filteredRecords]);
 
   const data: DashboardData | null = useMemo(() => {
-    if (filteredRecords.length === 0) {
+    if (recordsForMetrics.length === 0) {
       return null;
     }
-    return buildDashboardData(filteredRecords);
-  }, [filteredRecords]);
+    return buildDashboardData(recordsForMetrics);
+  }, [recordsForMetrics]);
 
   const revenueSeries = useMemo(() => {
     if (selectedMonth === 'all') {
@@ -157,6 +178,10 @@ export default function App() {
   }, [data, filteredRecords, selectedMonth]);
 
   const revenueTitle = selectedMonth === 'all' ? 'Monthly Revenue Trend' : 'Daily Revenue Trend (Selected Month)';
+  const sharePolicyLabel =
+    analysisMode === 'ops'
+      ? 'the current allocation policy on completed trips'
+      : 'the legacy allocation policy across all statuses';
   const isSignedIn = Boolean(session);
   const supabaseModeMessage = !supabase
     ? 'Supabase not configured yet. Local dashboard mode still works.'
@@ -291,9 +316,7 @@ export default function App() {
         if (!isSignedIn) {
           throw new Error('Sign in to save uploads to Supabase.');
         }
-        const completedOnlyRecords = parsed.records.filter(
-          (record) => (record.status ?? '').trim().toLowerCase() === 'completed'
-        );
+        const completedOnlyRecords = parsed.records.filter(isCompletedTrip);
         const dashboard = buildDashboardData(completedOnlyRecords);
         const fileHashHex = await computeFileSha256Hex(file);
         const result = await saveUploadToSupabase(file.name, parsed.records, dashboard, fileHashHex);
@@ -520,7 +543,29 @@ export default function App() {
 
       {dataSource === 'currentUpload' && records.length > 0 ? (
         <section className="filter-controls">
-          <p className="filter-note">Completed trips only</p>
+          <label>
+            <input
+              type="radio"
+              name="analysisMode"
+              checked={analysisMode === 'ops'}
+              onChange={() => setAnalysisMode('ops')}
+            />
+            Ops mode
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="analysisMode"
+              checked={analysisMode === 'accounting'}
+              onChange={() => setAnalysisMode('accounting')}
+            />
+            Accounting mode
+          </label>
+          <p className="filter-note">
+            {analysisMode === 'ops'
+              ? 'Ops mode: completed trips only, current allocation policy.'
+              : 'Accounting mode: all statuses, legacy allocation policy.'}
+          </p>
           <MultiSelectFilter
             label="Owner"
             options={ownerOptions}
@@ -529,7 +574,7 @@ export default function App() {
               setSelectedOwners(nextOwners);
               setSelectedVehicles((currentVehicles) =>
                 currentVehicles.filter((vehicle) =>
-                  completedRecords.some((record) =>
+                  modeRecords.some((record) =>
                     nextOwners.length === 0
                       ? record.vehicleName === vehicle
                       : record.vehicleName === vehicle && nextOwners.includes(record.ownerName)
@@ -561,7 +606,12 @@ export default function App() {
       ) : null}
 
       {dataSource === 'currentUpload' && data ? (
-        <Dashboard data={data} revenueSeries={revenueSeries} revenueTitle={revenueTitle} />
+        <Dashboard
+          data={data}
+          revenueSeries={revenueSeries}
+          revenueTitle={revenueTitle}
+          sharePolicyLabel={sharePolicyLabel}
+        />
       ) : dataSource === 'currentUpload' && records.length > 0 ? (
         <p className="status">No rows match current filters.</p>
       ) : null}

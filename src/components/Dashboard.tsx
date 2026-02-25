@@ -16,6 +16,7 @@ type DashboardProps = {
   data: DashboardData;
   revenueSeries: Array<{ label: string; revenue: number }>;
   revenueTitle: string;
+  sharePolicyLabel: string;
 };
 
 type DashboardTab = 'overview' | 'ownerEconomics' | 'fleetOperations';
@@ -34,7 +35,7 @@ function percent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
-export default function Dashboard({ data, revenueSeries, revenueTitle }: DashboardProps) {
+export default function Dashboard({ data, revenueSeries, revenueTitle, sharePolicyLabel }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
 
   const averageUtilization = useMemo(() => {
@@ -175,7 +176,7 @@ export default function Dashboard({ data, revenueSeries, revenueTitle }: Dashboa
             </article>
           </div>
           <p className="metric-note">
-            LR/Owner shares are computed from legacy split line-items (trip price, discounts, fees, extras), not from gross revenue only.
+            LR/Owner shares use {sharePolicyLabel}, not gross revenue only.
           </p>
 
           <article className="table-card">

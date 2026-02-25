@@ -20,11 +20,11 @@ type ColumnMap = {
   guestLastName?: string;
   status?: string;
   isCancelled?: string;
-  splitItemColumns: Partial<Record<SplitItem, string>>;
+  splitItemColumns: Partial<Record<string, string>>;
 };
 
 // Allocation policy: see docs/decisions/0001-line-item-allocation.md
-const splitRatios = {
+const currentSplitRatios: Record<string, { lrBps: number; ownerBps: number }> = {
   'Trip price': { lrBps: 3000, ownerBps: 7000 },
   'Boost price': { lrBps: 3000, ownerBps: 7000 },
   '3-day discount': { lrBps: 3000, ownerBps: 7000 },
@@ -56,9 +56,36 @@ const splitRatios = {
   'Other fees': { lrBps: 10000, ownerBps: 0 },
   'Gas fee': { lrBps: 10000, ownerBps: 0 },
   'Sales tax': { lrBps: 10000, ownerBps: 0 },
-} as const;
+};
 
-type SplitItem = keyof typeof splitRatios;
+// Legacy policy from turo_clean_data.py, preserved for historical parity checks.
+const legacySplitRatios: Record<string, { lrBps: number; ownerBps: number }> = {
+  'Trip price': { lrBps: 3000, ownerBps: 7000 },
+  'Boost price': { lrBps: 3000, ownerBps: 7000 },
+  'Cancellation fee': { lrBps: 3000, ownerBps: 7000 },
+  'Additional usage': { lrBps: 3000, ownerBps: 7000 },
+  'Excess distance': { lrBps: 0, ownerBps: 10000 },
+  Smoking: { lrBps: 9000, ownerBps: 1000 },
+  Delivery: { lrBps: 9000, ownerBps: 1000 },
+  Extras: { lrBps: 10000, ownerBps: 0 },
+  'Gas reimbursement': { lrBps: 10000, ownerBps: 0 },
+  Cleaning: { lrBps: 10000, ownerBps: 0 },
+  'Late fee': { lrBps: 10000, ownerBps: 0 },
+  'Improper return fee': { lrBps: 10000, ownerBps: 0 },
+  '3-day discount': { lrBps: 3000, ownerBps: 7000 },
+  '1-week discount': { lrBps: 3000, ownerBps: 7000 },
+  '2-week discount': { lrBps: 3000, ownerBps: 7000 },
+  '1-month discount': { lrBps: 3000, ownerBps: 7000 },
+  '2-month discount': { lrBps: 3000, ownerBps: 7000 },
+  '3-month discount': { lrBps: 3000, ownerBps: 7000 },
+  'Early bird discount': { lrBps: 3000, ownerBps: 7000 },
+  'Host promotional credit': { lrBps: 3000, ownerBps: 7000 },
+  'On-trip EV charging': { lrBps: 10000, ownerBps: 0 },
+  'Post-trip EV charging': { lrBps: 10000, ownerBps: 0 },
+  'Tolls & tickets': { lrBps: 10000, ownerBps: 0 },
+  'Other fees': { lrBps: 10000, ownerBps: 0 },
+  'Airport parking credit': { lrBps: 0, ownerBps: 10000 },
+};
 
 const recordSchema = z.object({
   rowNumber: z.number().int().positive(),
@@ -72,6 +99,8 @@ const recordSchema = z.object({
   addonsRevenue: z.number().finite().nullable(),
   lrShare: z.number().finite(),
   ownerShare: z.number().finite(),
+  legacyLrShare: z.number().finite(),
+  legacyOwnerShare: z.number().finite(),
   isCancelled: z.boolean(),
   status: z.string().nullable(),
 });
@@ -154,15 +183,34 @@ function buildColumnMap(headers: string[]): ColumnMap {
   };
 }
 
-function buildSplitItemColumns(headers: string[]): Partial<Record<SplitItem, string>> {
-  const columns: Partial<Record<SplitItem, string>> = {};
-  for (const item of Object.keys(splitRatios) as SplitItem[]) {
+function buildSplitItemColumns(headers: string[]): Partial<Record<string, string>> {
+  const columns: Partial<Record<string, string>> = {};
+  const splitItems = new Set([...Object.keys(currentSplitRatios), ...Object.keys(legacySplitRatios)]);
+  for (const item of splitItems) {
     const found = findColumn(headers, [normalizeHeader(item)]);
     if (found) {
       columns[item] = found;
     }
   }
   return columns;
+}
+
+function computeSplitSharesCents(
+  raw: RawRow,
+  map: ColumnMap,
+  splitRatios: Record<string, { lrBps: number; ownerBps: number }>
+): { lrShareCents: number; ownerShareCents: number } {
+  let lrShareCents = 0;
+  let ownerShareCents = 0;
+  for (const [item, ratio] of Object.entries(splitRatios)) {
+    const columnName = map.splitItemColumns[item];
+    const amountCents = parseMoneyCents(columnName ? raw[columnName] : undefined) ?? 0;
+    const lrPartCents = Math.round((amountCents * ratio.lrBps) / 10000);
+    const ownerPartCents = amountCents - lrPartCents;
+    lrShareCents += lrPartCents;
+    ownerShareCents += ownerPartCents;
+  }
+  return { lrShareCents, ownerShareCents };
 }
 
 function parseDate(value: string): Date | null {
@@ -304,16 +352,12 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     throw new Error(`Row ${rowNumber}: invalid date or revenue format.`);
   }
 
-  let lrShareCents = 0;
-  let ownerShareCents = 0;
-  for (const item of Object.keys(splitRatios) as SplitItem[]) {
-    const columnName = map.splitItemColumns[item];
-    const amountCents = parseMoneyCents(columnName ? raw[columnName] : undefined) ?? 0;
-    const lrPartCents = Math.round((amountCents * splitRatios[item].lrBps) / 10000);
-    const ownerPartCents = amountCents - lrPartCents;
-    lrShareCents += lrPartCents;
-    ownerShareCents += ownerPartCents;
-  }
+  const { lrShareCents, ownerShareCents } = computeSplitSharesCents(raw, map, currentSplitRatios);
+  const { lrShareCents: legacyLrShareCents, ownerShareCents: legacyOwnerShareCents } = computeSplitSharesCents(
+    raw,
+    map,
+    legacySplitRatios
+  );
 
   const cleanVehicleName = map.vehicleName ? String(raw[map.vehicleName] ?? '').trim() : '';
   const rawVehicleName = map.vehicleRaw ? String(raw[map.vehicleRaw] ?? '').trim() : '';
@@ -352,6 +396,8 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     addonsRevenue: map.addonsRevenue ? parseMoney(raw[map.addonsRevenue]) : null,
     lrShare: lrShareCents / 100,
     ownerShare: ownerShareCents / 100,
+    legacyLrShare: legacyLrShareCents / 100,
+    legacyOwnerShare: legacyOwnerShareCents / 100,
     isCancelled: parseCancelled(raw, map),
     status: map.status ? String(raw[map.status] ?? '').trim() || null : null,
   };

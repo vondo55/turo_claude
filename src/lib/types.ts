@@ -10,6 +10,8 @@ export type TuroTripRecord = {
   addonsRevenue: number | null;
   lrShare: number;
   ownerShare: number;
+  legacyLrShare: number;
+  legacyOwnerShare: number;
   isCancelled: boolean;
   status: string | null;
 };
