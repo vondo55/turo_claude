@@ -13,6 +13,7 @@ type CopilotDrawerProps = {
   onAction: (action: CopilotAction) => void;
   onClear: () => void;
   onReceiptsSelected: (files: FileList) => void;
+  onOpenReimbursementForm: () => void;
   receiptUploadLoading: boolean;
   receiptUploadDisabled: boolean;
 };
@@ -36,6 +37,7 @@ export default function CopilotDrawer({
   onAction,
   onClear,
   onReceiptsSelected,
+  onOpenReimbursementForm,
   receiptUploadLoading,
   receiptUploadDisabled,
 }: CopilotDrawerProps) {
@@ -78,6 +80,9 @@ export default function CopilotDrawer({
             <button type="button" onClick={() => onAction({ type: 'export_pdf', label: 'Export PDF' })}>
               Export PDF
             </button>
+            <button type="button" onClick={onOpenReimbursementForm}>
+              Open Reimbursement Form
+            </button>
           </div>
           <label className={receiptUploadDisabled ? 'receipt-upload disabled' : 'receipt-upload'}>
             <span>Upload Receipts</span>
@@ -99,7 +104,7 @@ export default function CopilotDrawer({
                 ? 'Sign in and configure Supabase to upload receipts.'
                 : receiptUploadLoading
                   ? 'Uploading...'
-                  : 'Images and PDF supported.'}
+                  : 'Uploads receipts, then opens the reimbursement form with prefill.'}
             </small>
           </label>
         </section>

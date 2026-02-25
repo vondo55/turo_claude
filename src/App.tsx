@@ -4,6 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import CopilotDrawer from './components/CopilotDrawer';
 import Dashboard from './components/Dashboard';
 import MultiSelectFilter from './components/MultiSelectFilter';
+import ReimbursementForm, { type ReceiptPrefillSeed } from './components/ReimbursementForm';
 import UploadZone from './components/UploadZone';
 import { answerWithLocalCopilot, buildCopilotContext, hasMutationIntent, type CopilotAction, type CopilotMessage } from './lib/copilot';
 import { parseTuroCsv } from './lib/csv';
@@ -23,6 +24,12 @@ import type { DashboardData, TuroTripRecord } from './lib/types';
 import type { UploadHistoryItem } from './lib/supabase';
 
 type AnalysisMode = 'ops' | 'accounting';
+
+type ReceiptInference = {
+  inferredDate: string | null;
+  inferredAmount: number | null;
+  inferredDescription: string | null;
+};
 
 function getErrorMessage(caughtError: unknown) {
   if (caughtError instanceof Error) {
@@ -63,6 +70,28 @@ function isCompletedTrip(record: TuroTripRecord): boolean {
   return (record.status ?? '').trim().toLowerCase() === 'completed';
 }
 
+function inferReceiptFields(file: File): ReceiptInference {
+  const name = file.name.toLowerCase();
+  const dateMatch = name.match(/(20\d{2})[-_]?([01]\d)[-_]?([0-3]\d)/);
+  const inferredDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : null;
+
+  const amountMatch = file.name.match(/-?\$?\d+(?:\.\d{1,2})?/);
+  const inferredAmount = amountMatch ? Number(amountMatch[0].replace('$', '')) : null;
+
+  let inferredDescription: string | null = null;
+  if (name.includes('lax') && name.includes('park')) inferredDescription = 'LAX Parking Reimbursement';
+  else if (name.includes('lgb') && name.includes('park')) inferredDescription = 'LGB Parking Reimbursement';
+  else if (name.includes('sna') && name.includes('park')) inferredDescription = 'SNA Parking Reimbursement';
+  else if (name.includes('fuel') || name.includes('gas')) inferredDescription = 'Fuel Reimbursement';
+  else if (name.includes('oil')) inferredDescription = 'Oil Change Fee';
+  else if (name.includes('inspection')) inferredDescription = 'Turo Inspection Fee';
+  else if (name.includes('wash')) inferredDescription = 'Car Wash Reimbursement';
+  else if (name.includes('toll')) inferredDescription = 'Toll Reimbursement';
+  else if (name.includes('ticket')) inferredDescription = 'Parking Ticket Reimbursement';
+
+  return { inferredDate, inferredAmount: Number.isFinite(inferredAmount ?? NaN) ? inferredAmount : null, inferredDescription };
+}
+
 function csvCell(value: string | number | null): string {
   const raw = value === null ? '' : String(value);
   return `"${raw.split('"').join('""')}"`;
@@ -78,6 +107,15 @@ function downloadFile(filename: string, content: string, mimeType: string): void
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function exportCurrentViewCsv(
@@ -134,17 +172,12 @@ function exportCurrentViewPdf(
   selectedVehicles: string[],
   analysisMode: AnalysisMode
 ): void {
-  const reportWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=768');
-  if (!reportWindow) {
-    throw new Error('Popup blocked. Allow popups to export PDF.');
-  }
-
   const rows = data.vehicleBreakdown.slice(0, 25);
   const ownerFilter = selectedOwners.length > 0 ? selectedOwners.join(', ') : 'All owners';
   const vehicleFilter = selectedVehicles.length > 0 ? selectedVehicles.join(', ') : 'All vehicles';
   const monthFilter = selectedMonth === 'all' ? 'All months' : selectedMonth;
 
-  reportWindow.document.write(`
+  const html = `
     <html>
       <head>
         <title>Turo Codex Export</title>
@@ -161,11 +194,11 @@ function exportCurrentViewPdf(
       </head>
       <body>
         <h1>Turo Codex - Current View Export</h1>
-        <p class="meta">Generated: ${new Date().toLocaleString()}</p>
-        <p class="meta">Mode: ${analysisMode}</p>
-        <p class="meta">Month: ${monthFilter}</p>
-        <p class="meta">Owners: ${ownerFilter}</p>
-        <p class="meta">Vehicles: ${vehicleFilter}</p>
+        <p class="meta">Generated: ${escapeHtml(new Date().toLocaleString())}</p>
+        <p class="meta">Mode: ${escapeHtml(analysisMode)}</p>
+        <p class="meta">Month: ${escapeHtml(monthFilter)}</p>
+        <p class="meta">Owners: ${escapeHtml(ownerFilter)}</p>
+        <p class="meta">Vehicles: ${escapeHtml(vehicleFilter)}</p>
 
         <h2>Key Metrics</h2>
         <p class="kpi">Bookings: ${data.metrics.totalBookings.toLocaleString()}</p>
@@ -189,8 +222,8 @@ function exportCurrentViewPdf(
             ${rows
               .map(
                 (row) => `<tr>
-                  <td>${row.ownerName}</td>
-                  <td>${row.vehicle}</td>
+                  <td>${escapeHtml(row.ownerName)}</td>
+                  <td>${escapeHtml(row.vehicle)}</td>
                   <td>${row.totalBookings}</td>
                   <td>${row.totalEarnings.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
                   <td>${row.lrShare.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
@@ -202,10 +235,23 @@ function exportCurrentViewPdf(
         </table>
       </body>
     </html>
-  `);
-  reportWindow.document.close();
-  reportWindow.focus();
-  reportWindow.print();
+  `;
+
+  const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+  const reportWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  if (!reportWindow) {
+    URL.revokeObjectURL(blobUrl);
+    throw new Error('Popup blocked. Allow popups to export PDF.');
+  }
+  reportWindow.addEventListener(
+    'load',
+    () => {
+      reportWindow.focus();
+      reportWindow.print();
+      URL.revokeObjectURL(blobUrl);
+    },
+    { once: true }
+  );
 }
 
 export default function App() {
@@ -235,6 +281,7 @@ export default function App() {
   const [copilotInput, setCopilotInput] = useState('');
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [receiptUploadLoading, setReceiptUploadLoading] = useState(false);
+  const [receiptPrefillSeed, setReceiptPrefillSeed] = useState<ReceiptPrefillSeed | null>(null);
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([
     {
       id: 'welcome',
@@ -591,17 +638,40 @@ export default function App() {
     setInfo(null);
     setReceiptUploadLoading(true);
     let successCount = 0;
+    const uploadedDocumentIds: string[] = [];
+    const fileNames: string[] = [];
+    let combinedInference: ReceiptInference = {
+      inferredDate: null,
+      inferredAmount: null,
+      inferredDescription: null,
+    };
 
     try {
       for (const file of Array.from(files)) {
-        await saveReceiptToSupabase(file, 'receipt');
+        const upload = await saveReceiptToSupabase(file, 'receipt');
+        uploadedDocumentIds.push(upload.documentId);
+        fileNames.push(file.name);
+        const inferred = inferReceiptFields(file);
+        combinedInference = {
+          inferredDate: combinedInference.inferredDate ?? inferred.inferredDate,
+          inferredAmount: combinedInference.inferredAmount ?? inferred.inferredAmount,
+          inferredDescription: combinedInference.inferredDescription ?? inferred.inferredDescription,
+        };
         successCount += 1;
       }
       setInfo(`Uploaded ${successCount} receipt${successCount === 1 ? '' : 's'} successfully.`);
+      setReceiptPrefillSeed({
+        token: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        documentIds: uploadedDocumentIds,
+        inferredDate: combinedInference.inferredDate,
+        inferredAmount: combinedInference.inferredAmount,
+        inferredDescription: combinedInference.inferredDescription,
+        sourceFileNames: fileNames,
+      });
       addCopilotMessage({
         id: `a-${Date.now()}-receipt-upload`,
         role: 'assistant',
-        text: `Uploaded ${successCount} file${successCount === 1 ? '' : 's'} to receipt storage and created document records.`,
+        text: `Uploaded ${successCount} file${successCount === 1 ? '' : 's'} to receipt storage and opened the reimbursement form with prefill.`,
         citations: ['documents', 'storage.receipts'],
       });
     } catch (caughtError) {
@@ -641,8 +711,24 @@ export default function App() {
         onReceiptsSelected={(files) => {
           void handleReceiptSelection(files);
         }}
+        onOpenReimbursementForm={() =>
+          setReceiptPrefillSeed({
+            token: `${Date.now()}-manual-open`,
+            documentIds: [],
+            inferredDate: null,
+            inferredAmount: null,
+            inferredDescription: null,
+            sourceFileNames: [],
+          })
+        }
         receiptUploadLoading={receiptUploadLoading}
         receiptUploadDisabled={!supabase || !isSignedIn}
+      />
+
+      <ReimbursementForm
+        isSignedIn={isSignedIn}
+        prefillSeed={receiptPrefillSeed}
+        onClearPrefillSeed={() => setReceiptPrefillSeed(null)}
       />
 
       {supabase ? (

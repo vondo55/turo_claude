@@ -28,6 +28,29 @@ type ReceiptUploadResult = {
   storagePath: string;
 };
 
+export type SaveExpenseSubmissionInput = {
+  requesterName: string;
+  expenseDate: string;
+  amount: number;
+  errandAmount: number | null;
+  description: string;
+  paidPersonalCard: boolean;
+  vehicle: string;
+  receiptDocumentIds: string[];
+  metadata?: Record<string, unknown> | null;
+};
+
+export type ExpenseSubmissionHistoryItem = {
+  id: string;
+  createdAt: string;
+  requesterName: string;
+  expenseDate: string;
+  amount: number;
+  description: string;
+  vehicle: string;
+  receiptDocumentIds: string[];
+};
+
 export type UploadHistoryItem = {
   id: string;
   createdAt: string;
@@ -301,6 +324,63 @@ export async function saveUploadToSupabase(
   }
 
   return { duplicateUpload };
+}
+
+export async function saveExpenseSubmissionToSupabase(input: SaveExpenseSubmissionInput) {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
+  }
+
+  const userId = await getCurrentUserId();
+  const { error } = await supabase.from('expense_submissions').insert({
+    user_id: userId,
+    requester_name: input.requesterName,
+    expense_date: input.expenseDate,
+    amount: input.amount,
+    errand_amount: input.errandAmount,
+    description: input.description,
+    paid_personal_card: input.paidPersonalCard,
+    vehicle: input.vehicle,
+    receipt_document_ids: input.receiptDocumentIds,
+    metadata: input.metadata ?? {},
+  });
+
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to save expense submission.'));
+  }
+}
+
+export async function getExpenseSubmissionHistory(limit = 25): Promise<ExpenseSubmissionHistoryItem[]> {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
+  }
+
+  const { data, error } = await supabase
+    .from('expense_submissions')
+    .select('id, created_at, requester_name, expense_date, amount, description, vehicle, receipt_document_ids')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(formatSupabaseError(error, 'Failed to load expense submissions.'));
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    createdAt: row.created_at as string,
+    requesterName: row.requester_name as string,
+    expenseDate: row.expense_date as string,
+    amount: Number(row.amount),
+    description: row.description as string,
+    vehicle: row.vehicle as string,
+    receiptDocumentIds: Array.isArray(row.receipt_document_ids)
+      ? (row.receipt_document_ids as string[])
+      : [],
+  }));
 }
 
 export async function signInWithEmail(email: string, password: string) {
