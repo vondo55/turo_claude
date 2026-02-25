@@ -422,6 +422,222 @@ body {
   overflow-x: auto;
 }
 
+.copilot-toggle {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  border: 0;
+  border-radius: 999px;
+  background: #0b6e4f;
+  color: #fff;
+  font-weight: 700;
+  padding: 0.7rem 1rem;
+  box-shadow: 0 10px 26px rgba(16, 42, 67, 0.25);
+  cursor: pointer;
+}
+
+.copilot-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(430px, 100vw);
+  height: 100vh;
+  background: #f8fcfa;
+  border-left: 1px solid #d9e2ec;
+  box-shadow: -8px 0 22px rgba(16, 42, 67, 0.18);
+  z-index: 50;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  transform: translateX(100%);
+  transition: transform 180ms ease;
+}
+
+.copilot-drawer.open {
+  transform: translateX(0);
+}
+
+.copilot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-bottom: 1px solid #e4ebf2;
+}
+
+.copilot-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.copilot-header p {
+  margin: 0.25rem 0 0;
+  color: #486581;
+  font-size: 0.88rem;
+}
+
+.ghost-button {
+  border: 1px solid #bcccdc;
+  background: #fff;
+  color: #102a43;
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+.copilot-quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #e4ebf2;
+}
+
+.copilot-tools {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #e4ebf2;
+  background: #f4faf7;
+}
+
+.copilot-tools h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+}
+
+.tool-buttons {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.tool-buttons button {
+  background: #0b6e4f;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.36rem 0.6rem;
+  cursor: pointer;
+}
+
+.receipt-upload {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  font-size: 0.87rem;
+}
+
+.receipt-upload span {
+  font-weight: 600;
+}
+
+.receipt-upload input[type='file'] {
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  padding: 0.42rem;
+  background: #fff;
+}
+
+.receipt-upload small {
+  color: #627d98;
+}
+
+.receipt-upload.disabled {
+  opacity: 0.68;
+}
+
+.chip-button {
+  border: 1px solid #bcccdc;
+  background: #ffffff;
+  color: #334e68;
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.copilot-messages {
+  padding: 1rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.message {
+  border-radius: 10px;
+  padding: 0.65rem 0.7rem;
+}
+
+.message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.message small {
+  display: block;
+  margin-top: 0.35rem;
+  color: #627d98;
+}
+
+.message.user {
+  background: #d8f3e8;
+}
+
+.message.assistant {
+  background: #fff;
+  border: 1px solid #e4ebf2;
+}
+
+.message-actions {
+  margin-top: 0.45rem;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.message-actions button {
+  background: #0b6e4f;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+
+.copilot-loading {
+  margin: 0;
+  color: #486581;
+}
+
+.copilot-input {
+  border-top: 1px solid #e4ebf2;
+  padding: 0.7rem 1rem 0.9rem;
+  background: #f5fbf8;
+}
+
+.copilot-input input {
+  width: 100%;
+  border: 1px solid #bcccdc;
+  border-radius: 8px;
+  padding: 0.55rem;
+}
+
+.copilot-input-actions {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.copilot-input-actions button[type='submit'] {
+  background: #0b6e4f;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -464,5 +680,9 @@ tfoot th {
 
   .history-grid {
     grid-template-columns: 1fr;
+  }
+
+  .copilot-drawer {
+    width: 100vw;
   }
 }

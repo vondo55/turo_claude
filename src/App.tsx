@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import CopilotDrawer from './components/CopilotDrawer';
 import Dashboard from './components/Dashboard';
 import MultiSelectFilter from './components/MultiSelectFilter';
 import UploadZone from './components/UploadZone';
+import { answerWithLocalCopilot, buildCopilotContext, hasMutationIntent, type CopilotAction, type CopilotMessage } from './lib/copilot';
 import { parseTuroCsv } from './lib/csv';
 import { buildDashboardData } from './lib/metrics';
 import {
@@ -11,6 +13,7 @@ import {
   getSupabaseSession,
   getUploadHistory,
   onSupabaseAuthStateChange,
+  saveReceiptToSupabase,
   saveUploadToSupabase,
   signInWithEmail,
   signOutFromSupabase,
@@ -60,6 +63,151 @@ function isCompletedTrip(record: TuroTripRecord): boolean {
   return (record.status ?? '').trim().toLowerCase() === 'completed';
 }
 
+function csvCell(value: string | number | null): string {
+  const raw = value === null ? '' : String(value);
+  return `"${raw.split('"').join('""')}"`;
+}
+
+function downloadFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportCurrentViewCsv(
+  data: DashboardData,
+  filteredRecords: TuroTripRecord[],
+  selectedMonth: string,
+  analysisMode: AnalysisMode
+): string {
+  const lines: string[] = [];
+  lines.push('Report,Value');
+  lines.push(`${csvCell('Generated At')},${csvCell(new Date().toISOString())}`);
+  lines.push(`${csvCell('Mode')},${csvCell(analysisMode)}`);
+  lines.push(`${csvCell('Selected Month')},${csvCell(selectedMonth)}`);
+  lines.push(`${csvCell('Total Bookings')},${csvCell(data.metrics.totalBookings)}`);
+  lines.push(`${csvCell('Total Earnings')},${csvCell(data.metrics.totalEarnings.toFixed(2))}`);
+  lines.push(`${csvCell('LR Share')},${csvCell(data.metrics.lrShare.toFixed(2))}`);
+  lines.push(`${csvCell('Owner Share')},${csvCell(data.metrics.ownerShare.toFixed(2))}`);
+  lines.push('');
+  lines.push('Owner,Vehicle,Bookings,Total Earnings,LR Share,Owner Share');
+  for (const row of data.vehicleBreakdown) {
+    lines.push(
+      [
+        csvCell(row.ownerName),
+        csvCell(row.vehicle),
+        csvCell(row.totalBookings),
+        csvCell(row.totalEarnings.toFixed(2)),
+        csvCell(row.lrShare.toFixed(2)),
+        csvCell(row.ownerShare.toFixed(2)),
+      ].join(',')
+    );
+  }
+  lines.push('');
+  lines.push('Trip End Date,Owner,Vehicle,Gross Revenue,LR Share,Owner Share,Status');
+  for (const row of filteredRecords) {
+    lines.push(
+      [
+        csvCell(row.tripEnd.toISOString().slice(0, 10)),
+        csvCell(row.ownerName),
+        csvCell(row.vehicleName),
+        csvCell(row.grossRevenue.toFixed(2)),
+        csvCell(row.lrShare.toFixed(2)),
+        csvCell(row.ownerShare.toFixed(2)),
+        csvCell(row.status ?? ''),
+      ].join(',')
+    );
+  }
+  return lines.join('\n');
+}
+
+function exportCurrentViewPdf(
+  data: DashboardData,
+  selectedMonth: string,
+  selectedOwners: string[],
+  selectedVehicles: string[],
+  analysisMode: AnalysisMode
+): void {
+  const reportWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=768');
+  if (!reportWindow) {
+    throw new Error('Popup blocked. Allow popups to export PDF.');
+  }
+
+  const rows = data.vehicleBreakdown.slice(0, 25);
+  const ownerFilter = selectedOwners.length > 0 ? selectedOwners.join(', ') : 'All owners';
+  const vehicleFilter = selectedVehicles.length > 0 ? selectedVehicles.join(', ') : 'All vehicles';
+  const monthFilter = selectedMonth === 'all' ? 'All months' : selectedMonth;
+
+  reportWindow.document.write(`
+    <html>
+      <head>
+        <title>Turo Codex Export</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #102a43; }
+          h1 { margin: 0 0 12px; }
+          h2 { margin: 20px 0 8px; font-size: 18px; }
+          .meta { margin: 0 0 6px; color: #334e68; }
+          .kpi { margin: 0 0 4px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+          th, td { border: 1px solid #d9e2ec; text-align: left; padding: 6px; }
+          th { background: #f0f4f8; }
+        </style>
+      </head>
+      <body>
+        <h1>Turo Codex - Current View Export</h1>
+        <p class="meta">Generated: ${new Date().toLocaleString()}</p>
+        <p class="meta">Mode: ${analysisMode}</p>
+        <p class="meta">Month: ${monthFilter}</p>
+        <p class="meta">Owners: ${ownerFilter}</p>
+        <p class="meta">Vehicles: ${vehicleFilter}</p>
+
+        <h2>Key Metrics</h2>
+        <p class="kpi">Bookings: ${data.metrics.totalBookings.toLocaleString()}</p>
+        <p class="kpi">Total Earnings: ${data.metrics.totalEarnings.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
+        <p class="kpi">LR Share: ${data.metrics.lrShare.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
+        <p class="kpi">Owner Share: ${data.metrics.ownerShare.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
+
+        <h2>Top 25 Vehicles by Earnings</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Owner</th>
+              <th>Vehicle</th>
+              <th>Bookings</th>
+              <th>Total Earnings</th>
+              <th>LR Share</th>
+              <th>Owner Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(
+                (row) => `<tr>
+                  <td>${row.ownerName}</td>
+                  <td>${row.vehicle}</td>
+                  <td>${row.totalBookings}</td>
+                  <td>${row.totalEarnings.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                  <td>${row.lrShare.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                  <td>${row.ownerShare.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                </tr>`
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `);
+  reportWindow.document.close();
+  reportWindow.focus();
+  reportWindow.print();
+}
+
 export default function App() {
   const [records, setRecords] = useState<TuroTripRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -83,6 +231,18 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copilotInput, setCopilotInput] = useState('');
+  const [copilotLoading, setCopilotLoading] = useState(false);
+  const [receiptUploadLoading, setReceiptUploadLoading] = useState(false);
+  const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      text: 'Copilot is ready in free read-only mode. Ask about the current view, or export CSV/PDF.',
+      citations: ['guardrails'],
+    },
+  ]);
 
   const modeRecords = useMemo(() => {
     if (analysisMode === 'ops') {
@@ -157,7 +317,6 @@ export default function App() {
     }
     return buildDashboardData(recordsForMetrics);
   }, [recordsForMetrics]);
-
   const revenueSeries = useMemo(() => {
     if (selectedMonth === 'all') {
       return data?.monthlyRevenue.map((row) => ({ label: row.month, revenue: row.revenue })) ?? [];
@@ -176,6 +335,21 @@ export default function App() {
         revenue: Number(revenue.toFixed(2)),
       }));
   }, [data, filteredRecords, selectedMonth]);
+
+  const copilotContext = useMemo(() => {
+    if (dataSource !== 'currentUpload' || !data) {
+      return null;
+    }
+    return buildCopilotContext({
+      data,
+      dataSource,
+      mode: analysisMode,
+      selectedMonth,
+      selectedOwners,
+      selectedVehicles,
+      revenueSeries,
+    });
+  }, [analysisMode, data, dataSource, revenueSeries, selectedMonth, selectedOwners, selectedVehicles]);
 
   const revenueTitle = selectedMonth === 'all' ? 'Monthly Revenue Trend' : 'Daily Revenue Trend (Selected Month)';
   const sharePolicyLabel =
@@ -335,6 +509,108 @@ export default function App() {
     }
   }
 
+  function addCopilotMessage(message: CopilotMessage): void {
+    setCopilotMessages((current) => [...current, message]);
+  }
+
+  function handleCopilotAction(action: CopilotAction): void {
+    if (!data || dataSource !== 'currentUpload') {
+      setError('Copilot export is available only in current upload mode with active data.');
+      return;
+    }
+    try {
+      if (action.type === 'export_csv') {
+        const csv = exportCurrentViewCsv(data, filteredRecords, selectedMonth, analysisMode);
+        downloadFile(`turo-current-view-${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8');
+        setInfo('Exported CSV for the current filtered view.');
+      } else {
+        exportCurrentViewPdf(data, selectedMonth, selectedOwners, selectedVehicles, analysisMode);
+        setInfo('Opened print dialog for PDF export.');
+      }
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    }
+  }
+
+  function submitCopilotQuestion(questionFromInput?: string): void {
+    const question = (questionFromInput ?? copilotInput).trim();
+    if (!question) return;
+
+    addCopilotMessage({
+      id: `u-${Date.now()}`,
+      role: 'user',
+      text: question,
+    });
+    setCopilotInput('');
+
+    if (dataSource !== 'currentUpload') {
+      addCopilotMessage({
+        id: `a-${Date.now()}-history`,
+        role: 'assistant',
+        text: 'Copilot free mode currently supports current upload mode only. Switch data source to current upload.',
+        citations: ['guardrails'],
+      });
+      return;
+    }
+
+    if (!copilotContext) {
+      addCopilotMessage({
+        id: `a-${Date.now()}-empty`,
+        role: 'assistant',
+        text: 'Upload a CSV and select a view first, then I can answer using the current filtered dashboard data.',
+        citations: ['guardrails'],
+      });
+      return;
+    }
+
+    setCopilotLoading(true);
+    window.setTimeout(() => {
+      const response = answerWithLocalCopilot(question, copilotContext);
+      addCopilotMessage({
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        text: response.text,
+        citations: response.citations,
+        actions: response.actions,
+      });
+
+      if (hasMutationIntent(question)) {
+        setInfo('Copilot blocked a write/mutation request because read-only mode is enabled.');
+      }
+      setCopilotLoading(false);
+    }, 120);
+  }
+
+  async function handleReceiptSelection(files: FileList): Promise<void> {
+    if (!supabase || !isSignedIn) {
+      setError('Sign in to Supabase before uploading receipts.');
+      return;
+    }
+
+    setError(null);
+    setInfo(null);
+    setReceiptUploadLoading(true);
+    let successCount = 0;
+
+    try {
+      for (const file of Array.from(files)) {
+        await saveReceiptToSupabase(file, 'receipt');
+        successCount += 1;
+      }
+      setInfo(`Uploaded ${successCount} receipt${successCount === 1 ? '' : 's'} successfully.`);
+      addCopilotMessage({
+        id: `a-${Date.now()}-receipt-upload`,
+        role: 'assistant',
+        text: `Uploaded ${successCount} file${successCount === 1 ? '' : 's'} to receipt storage and created document records.`,
+        citations: ['documents', 'storage.receipts'],
+      });
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      setReceiptUploadLoading(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -342,6 +618,32 @@ export default function App() {
         <h1>CSV to Business Insights</h1>
         <p className="subhead">Upload raw Turo export data and get KPI + trend insights immediately.</p>
       </header>
+      <CopilotDrawer
+        isOpen={isCopilotOpen}
+        inputValue={copilotInput}
+        messages={copilotMessages}
+        isLoading={copilotLoading}
+        onToggle={() => setIsCopilotOpen((current) => !current)}
+        onInputChange={setCopilotInput}
+        onSubmit={() => submitCopilotQuestion()}
+        onQuickPrompt={(prompt) => submitCopilotQuestion(prompt)}
+        onAction={handleCopilotAction}
+        onClear={() =>
+          setCopilotMessages([
+            {
+              id: `welcome-${Date.now()}`,
+              role: 'assistant',
+              text: 'Copilot is reset. Ask a question about the current filtered view.',
+              citations: ['guardrails'],
+            },
+          ])
+        }
+        onReceiptsSelected={(files) => {
+          void handleReceiptSelection(files);
+        }}
+        receiptUploadLoading={receiptUploadLoading}
+        receiptUploadDisabled={!supabase || !isSignedIn}
+      />
 
       {supabase ? (
         <section className="auth-panel">

@@ -21,6 +21,13 @@ type SaveUploadResult = {
   duplicateUpload: boolean;
 };
 
+type DocumentType = 'receipt' | 'trip_screenshot' | 'other';
+
+type ReceiptUploadResult = {
+  documentId: string;
+  storagePath: string;
+};
+
 export type UploadHistoryItem = {
   id: string;
   createdAt: string;
@@ -55,6 +62,10 @@ function formatSupabaseError(error: SupabaseErrorLike, fallback: string) {
 function formatUuidFromBytes(bytes: Uint8Array) {
   const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
 function buildUploadIdFromFileHash(fileHashHex: string) {
@@ -123,6 +134,60 @@ async function getCurrentUserId() {
     throw new Error('You must sign in before using Supabase persistence.');
   }
   return data.user.id;
+}
+
+async function computeFileSha256Hex(file: File) {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+export async function saveReceiptToSupabase(
+  file: File,
+  docType: DocumentType = 'receipt'
+): Promise<ReceiptUploadResult> {
+  if (!supabase) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+    );
+  }
+
+  const userId = await getCurrentUserId();
+  const safeFileName = sanitizeFileName(file.name);
+  const storagePath = `${userId}/${Date.now()}-${crypto.randomUUID()}-${safeFileName}`;
+  const sha256 = await computeFileSha256Hex(file);
+
+  const { error: storageError } = await supabase.storage.from('receipts').upload(storagePath, file, {
+    upsert: false,
+    contentType: file.type || undefined,
+  });
+
+  if (storageError) {
+    throw new Error(formatSupabaseError(storageError, 'Failed to upload receipt to storage.'));
+  }
+
+  const { data: insertedDocument, error: documentsError } = await supabase
+    .from('documents')
+    .insert({
+      uploaded_by: userId,
+      doc_type: docType,
+      storage_path: storagePath,
+      original_filename: file.name,
+      mime_type: file.type || null,
+      file_size_bytes: file.size,
+      sha256,
+    })
+    .select('id')
+    .single();
+
+  if (documentsError) {
+    await supabase.storage.from('receipts').remove([storagePath]);
+    throw new Error(formatSupabaseError(documentsError, 'Failed to insert documents row for receipt upload.'));
+  }
+
+  return {
+    documentId: insertedDocument.id as string,
+    storagePath,
+  };
 }
 
 export async function saveUploadToSupabase(
