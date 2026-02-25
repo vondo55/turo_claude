@@ -47,7 +47,27 @@ export default function Dashboard({ data, revenueSeries, revenueTitle, sharePoli
   const averageDowntime = Math.max(0, 100 - averageUtilization);
   const activeVehicles = data.vehicleBreakdown.length;
   const tripsPerVehicle = activeVehicles > 0 ? data.metrics.totalTrips / activeVehicles : 0;
-  const fleetChartVehicles = useMemo(() => data.vehiclePerformance.slice(0, 8), [data.vehiclePerformance]);
+  const fleetBookingsHistogram = useMemo(() => {
+    const bins = [
+      { label: '1-2', min: 1, max: 2, count: 0 },
+      { label: '3-5', min: 3, max: 5, count: 0 },
+      { label: '6-10', min: 6, max: 10, count: 0 },
+      { label: '11-15', min: 11, max: 15, count: 0 },
+      { label: '16+', min: 16, max: Number.POSITIVE_INFINITY, count: 0 },
+    ];
+
+    for (const vehicle of data.vehiclePerformance) {
+      const matchingBin = bins.find((bin) => vehicle.tripCount >= bin.min && vehicle.tripCount <= bin.max);
+      if (matchingBin) {
+        matchingBin.count += 1;
+      }
+    }
+
+    return bins.map((bin) => ({
+      range: bin.label,
+      vehicleCount: bin.count,
+    }));
+  }, [data.vehiclePerformance]);
   const lrSharePct = data.metrics.totalEarnings > 0 ? (data.metrics.lrShare / data.metrics.totalEarnings) * 100 : 0;
   const ownerSharePct = data.metrics.totalEarnings > 0 ? (data.metrics.ownerShare / data.metrics.totalEarnings) * 100 : 0;
   const reconciliationGap = data.metrics.totalEarnings - (data.metrics.lrShare + data.metrics.ownerShare);
@@ -260,14 +280,14 @@ export default function Dashboard({ data, revenueSeries, revenueTitle, sharePoli
             </article>
 
             <article className="chart-card">
-              <h3>Trips per Vehicle (Top 8 by Revenue)</h3>
+              <h3>Bookings Distribution Across Vehicles</h3>
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={fleetChartVehicles}>
+                <BarChart data={fleetBookingsHistogram}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="vehicle" interval={0} angle={-20} textAnchor="end" height={65} />
+                  <XAxis dataKey="range" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="tripCount" fill="#457b9d" name="Trips" />
+                  <Bar dataKey="vehicleCount" fill="#457b9d" name="Vehicles" />
                 </BarChart>
               </ResponsiveContainer>
             </article>
