@@ -96,21 +96,42 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
     }));
 
   const vehicleMap = new Map<string, { ownerName: string; grossRevenue: number; tripCount: number }>();
+  const vehicleMonthTripCounts = new Map<string, Map<string, number>>();
   for (const row of records) {
     const current = vehicleMap.get(row.vehicleName) ?? { ownerName: row.ownerName, grossRevenue: 0, tripCount: 0 };
     current.grossRevenue += row.grossRevenue;
     current.tripCount += 1;
     current.ownerName = row.ownerName;
     vehicleMap.set(row.vehicleName, current);
+
+    const monthCounts = vehicleMonthTripCounts.get(row.vehicleName) ?? new Map<string, number>();
+    const key = monthKey(row.tripEnd);
+    monthCounts.set(key, (monthCounts.get(key) ?? 0) + 1);
+    vehicleMonthTripCounts.set(row.vehicleName, monthCounts);
   }
 
   const vehiclePerformance = Array.from(vehicleMap.entries())
-    .map(([vehicle, values]) => ({
-      vehicle,
-      ownerName: values.ownerName,
-      grossRevenue: roundCurrency(values.grossRevenue),
-      tripCount: values.tripCount,
-    }))
+    .map(([vehicle, values]) => {
+      const monthCounts = vehicleMonthTripCounts.get(vehicle) ?? new Map<string, number>();
+      const monthlyUtilization = Array.from(monthCounts.entries()).map(([key, tripCount]) => {
+        const [year, month] = key.split('-').map(Number);
+        const capacityDays = daysInMonth(year, month - 1);
+        const bookedDays = tripCount * LABOR_HOURS_PER_BOOKING;
+        return Math.min((bookedDays / capacityDays) * 100, 100);
+      });
+      const utilizationPct =
+        monthlyUtilization.length > 0
+          ? Number((monthlyUtilization.reduce((sum, value) => sum + value, 0) / monthlyUtilization.length).toFixed(1))
+          : 0;
+
+      return {
+        vehicle,
+        ownerName: values.ownerName,
+        grossRevenue: roundCurrency(values.grossRevenue),
+        tripCount: values.tripCount,
+        utilizationPct,
+      };
+    })
     .sort((a, b) => b.grossRevenue - a.grossRevenue);
 
   const vehicleBreakdownMap = new Map<

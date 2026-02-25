@@ -62,5 +62,11 @@ export type DashboardData = {
   monthlyUtilization: Array<{ month: string; utilizationPct: number }>;
   monthlySplit: Array<{ month: string; lrShare: number; ownerShare: number }>;
   vehicleBreakdown: VehicleBreakdown[];
-  vehiclePerformance: Array<{ vehicle: string; ownerName: string; grossRevenue: number; tripCount: number }>;
+  vehiclePerformance: Array<{
+    vehicle: string;
+    ownerName: string;
+    grossRevenue: number;
+    tripCount: number;
+    utilizationPct: number;
+  }>;
 };

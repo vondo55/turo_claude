@@ -301,6 +301,7 @@ export default function Dashboard({ data, revenueSeries, revenueTitle, sharePoli
                   <th>Owner</th>
                   <th>Vehicle</th>
                   <th>Bookings</th>
+                  <th>Utilization %</th>
                   <th>Labor Hours</th>
                   <th>Gross Revenue</th>
                   <th>Revenue per Trip</th>
@@ -312,6 +313,7 @@ export default function Dashboard({ data, revenueSeries, revenueTitle, sharePoli
                     <td>{vehicle.ownerName}</td>
                     <td>{vehicle.vehicle}</td>
                     <td>{vehicle.tripCount}</td>
+                    <td>{percent(vehicle.utilizationPct)}</td>
                     <td>{vehicle.tripCount * 2}</td>
                     <td>{currency(vehicle.grossRevenue)}</td>
                     <td>{currency(vehicle.tripCount > 0 ? vehicle.grossRevenue / vehicle.tripCount : 0)}</td>
