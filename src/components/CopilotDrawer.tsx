@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import type { CopilotAction, CopilotMessage } from '../lib/copilot';
 
 type CopilotDrawerProps = {
@@ -16,6 +16,7 @@ type CopilotDrawerProps = {
   onOpenReimbursementForm: () => void;
   receiptUploadLoading: boolean;
   receiptUploadDisabled: boolean;
+  reimbursementContent?: ReactNode;
 };
 
 const quickPrompts = [
@@ -40,6 +41,7 @@ export default function CopilotDrawer({
   onOpenReimbursementForm,
   receiptUploadLoading,
   receiptUploadDisabled,
+  reimbursementContent,
 }: CopilotDrawerProps) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -108,6 +110,8 @@ export default function CopilotDrawer({
             </small>
           </label>
         </section>
+
+        {reimbursementContent ? <section className="copilot-reimbursement">{reimbursementContent}</section> : null}
 
         <div className="copilot-messages">
           {messages.map((message) => (

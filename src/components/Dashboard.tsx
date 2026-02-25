@@ -47,6 +47,7 @@ export default function Dashboard({ data, revenueSeries, revenueTitle, sharePoli
   const averageDowntime = Math.max(0, 100 - averageUtilization);
   const activeVehicles = data.vehicleBreakdown.length;
   const tripsPerVehicle = activeVehicles > 0 ? data.metrics.totalTrips / activeVehicles : 0;
+  const fleetChartVehicles = useMemo(() => data.vehiclePerformance.slice(0, 8), [data.vehiclePerformance]);
   const lrSharePct = data.metrics.totalEarnings > 0 ? (data.metrics.lrShare / data.metrics.totalEarnings) * 100 : 0;
   const ownerSharePct = data.metrics.totalEarnings > 0 ? (data.metrics.ownerShare / data.metrics.totalEarnings) * 100 : 0;
   const reconciliationGap = data.metrics.totalEarnings - (data.metrics.lrShare + data.metrics.ownerShare);
@@ -259,9 +260,9 @@ export default function Dashboard({ data, revenueSeries, revenueTitle, sharePoli
             </article>
 
             <article className="chart-card">
-              <h3>Trips per Vehicle</h3>
+              <h3>Trips per Vehicle (Top 8 by Revenue)</h3>
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={data.vehiclePerformance}>
+                <BarChart data={fleetChartVehicles}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="vehicle" interval={0} angle={-20} textAnchor="end" height={65} />
                   <YAxis />

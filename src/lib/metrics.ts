@@ -111,8 +111,7 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
       grossRevenue: roundCurrency(values.grossRevenue),
       tripCount: values.tripCount,
     }))
-    .sort((a, b) => b.grossRevenue - a.grossRevenue)
-    .slice(0, 8);
+    .sort((a, b) => b.grossRevenue - a.grossRevenue);
 
   const vehicleBreakdownMap = new Map<
     string,

@@ -723,12 +723,13 @@ export default function App() {
         }
         receiptUploadLoading={receiptUploadLoading}
         receiptUploadDisabled={!supabase || !isSignedIn}
-      />
-
-      <ReimbursementForm
-        isSignedIn={isSignedIn}
-        prefillSeed={receiptPrefillSeed}
-        onClearPrefillSeed={() => setReceiptPrefillSeed(null)}
+        reimbursementContent={
+          <ReimbursementForm
+            isSignedIn={isSignedIn}
+            prefillSeed={receiptPrefillSeed}
+            onClearPrefillSeed={() => setReceiptPrefillSeed(null)}
+          />
+        }
       />
 
       {supabase ? (
