@@ -141,7 +141,6 @@ export default function ReimbursementForm({
   prefillSeed,
   onClearPrefillSeed,
 }: ReimbursementFormProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FormState>(initialFormState);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitInfo, setSubmitInfo] = useState<string | null>(null);
@@ -156,7 +155,6 @@ export default function ReimbursementForm({
 
   useEffect(() => {
     if (!prefillSeed) return;
-    setIsOpen(true);
     setForm((current) => ({
       ...current,
       expenseDate: current.expenseDate || asIsoDate(prefillSeed.inferredDate),
@@ -251,20 +249,14 @@ export default function ReimbursementForm({
 
   return (
     <section className="reimbursement-panel">
-      <div className="history-header">
-        <h2>Reimbursement Form</h2>
-        <button type="button" onClick={() => setIsOpen((current) => !current)}>
-          {isOpen ? 'Hide form' : 'Open form'}
-        </button>
-      </div>
+      <h2>Reimbursement Form</h2>
       <p className="subhead">
         Reproduces your Google Form inside the app and writes entries to Supabase. Required fields are highlighted.
       </p>
 
       {!isSignedIn ? <p className="status">Sign in to save reimbursements to Supabase.</p> : null}
 
-      {isOpen ? (
-        <form className="reimbursement-form" onSubmit={handleSubmit}>
+      <form className="reimbursement-form" onSubmit={handleSubmit}>
           <label>
             Who are ya bro?*
             <select
@@ -439,11 +431,10 @@ export default function ReimbursementForm({
           {submitError ? <p className="error">{submitError}</p> : null}
           {submitInfo ? <p className="status">{submitInfo}</p> : null}
 
-          <button type="submit" disabled={!isSignedIn || isSaving}>
-            {isSaving ? 'Saving...' : 'Save reimbursement to Supabase'}
-          </button>
-        </form>
-      ) : null}
+        <button type="submit" disabled={!isSignedIn || isSaving}>
+          {isSaving ? 'Saving...' : 'Save reimbursement to Supabase'}
+        </button>
+      </form>
 
       <article className="table-card">
         <h3>Recent Reimbursement Submissions</h3>

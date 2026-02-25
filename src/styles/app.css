@@ -508,12 +508,16 @@ body {
 }
 
 .copilot-header {
+  position: sticky;
+  top: 0;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 0.7rem;
   padding: 1rem;
   border-bottom: 1px solid #e4ebf2;
+  background: #f8fcfa;
+  z-index: 2;
 }
 
 .copilot-header h2 {

@@ -31,6 +31,8 @@ type ReceiptInference = {
   inferredDescription: string | null;
 };
 
+const REIMBURSEMENT_PREFILL_STORAGE_KEY = 'turo_reimbursement_prefill_seed_v1';
+
 function getErrorMessage(caughtError: unknown) {
   if (caughtError instanceof Error) {
     return caughtError.message;
@@ -90,6 +92,30 @@ function inferReceiptFields(file: File): ReceiptInference {
   else if (name.includes('ticket')) inferredDescription = 'Parking Ticket Reimbursement';
 
   return { inferredDate, inferredAmount: Number.isFinite(inferredAmount ?? NaN) ? inferredAmount : null, inferredDescription };
+}
+
+function readStoredReimbursementPrefill(): ReceiptPrefillSeed | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(REIMBURSEMENT_PREFILL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ReceiptPrefillSeed;
+    return parsed && typeof parsed.token === 'string' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredReimbursementPrefill(prefill: ReceiptPrefillSeed): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(REIMBURSEMENT_PREFILL_STORAGE_KEY, JSON.stringify(prefill));
+}
+
+function clearStoredReimbursementPrefill(): void {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(REIMBURSEMENT_PREFILL_STORAGE_KEY);
 }
 
 function csvCell(value: string | number | null): string {
@@ -255,6 +281,8 @@ function exportCurrentViewPdf(
 }
 
 export default function App() {
+  const isReimbursementOnlyView =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'reimbursement';
   const [records, setRecords] = useState<TuroTripRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -281,7 +309,9 @@ export default function App() {
   const [copilotInput, setCopilotInput] = useState('');
   const [copilotLoading, setCopilotLoading] = useState(false);
   const [receiptUploadLoading, setReceiptUploadLoading] = useState(false);
-  const [receiptPrefillSeed, setReceiptPrefillSeed] = useState<ReceiptPrefillSeed | null>(null);
+  const [receiptPrefillSeed, setReceiptPrefillSeed] = useState<ReceiptPrefillSeed | null>(() =>
+    readStoredReimbursementPrefill()
+  );
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([
     {
       id: 'welcome',
@@ -560,6 +590,18 @@ export default function App() {
     setCopilotMessages((current) => [...current, message]);
   }
 
+  function openReimbursementWindow(prefillSeed: ReceiptPrefillSeed): void {
+    writeStoredReimbursementPrefill(prefillSeed);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'reimbursement');
+    const popup = window.open(url.toString(), '_blank', 'noopener,noreferrer,width=1180,height=920');
+    if (!popup) {
+      setError('Popup blocked. Allow popups to open the reimbursement form.');
+      return;
+    }
+    popup.focus();
+  }
+
   function handleCopilotAction(action: CopilotAction): void {
     if (!data || dataSource !== 'currentUpload') {
       setError('Copilot export is available only in current upload mode with active data.');
@@ -660,14 +702,16 @@ export default function App() {
         successCount += 1;
       }
       setInfo(`Uploaded ${successCount} receipt${successCount === 1 ? '' : 's'} successfully.`);
-      setReceiptPrefillSeed({
+      const nextPrefillSeed: ReceiptPrefillSeed = {
         token: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         documentIds: uploadedDocumentIds,
         inferredDate: combinedInference.inferredDate,
         inferredAmount: combinedInference.inferredAmount,
         inferredDescription: combinedInference.inferredDescription,
         sourceFileNames: fileNames,
-      });
+      };
+      setReceiptPrefillSeed(nextPrefillSeed);
+      openReimbursementWindow(nextPrefillSeed);
       addCopilotMessage({
         id: `a-${Date.now()}-receipt-upload`,
         role: 'assistant',
@@ -679,6 +723,33 @@ export default function App() {
     } finally {
       setReceiptUploadLoading(false);
     }
+  }
+
+  if (isReimbursementOnlyView) {
+    return (
+      <main className="app-shell">
+        <header className="app-header">
+          <p className="eyebrow">Turo Codex</p>
+          <h1>Reimbursement Form</h1>
+          <p className="subhead">Standalone reimbursement window. You can keep this open while reviewing dashboards.</p>
+        </header>
+
+        {supabase ? null : (
+          <p className="error">
+            Supabase is not configured. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to enable form saves.
+          </p>
+        )}
+
+        <ReimbursementForm
+          isSignedIn={isSignedIn}
+          prefillSeed={receiptPrefillSeed}
+          onClearPrefillSeed={() => {
+            setReceiptPrefillSeed(null);
+            clearStoredReimbursementPrefill();
+          }}
+        />
+      </main>
+    );
   }
 
   return (
@@ -712,7 +783,7 @@ export default function App() {
           void handleReceiptSelection(files);
         }}
         onOpenReimbursementForm={() =>
-          setReceiptPrefillSeed({
+          openReimbursementWindow({
             token: `${Date.now()}-manual-open`,
             documentIds: [],
             inferredDate: null,
@@ -723,13 +794,6 @@ export default function App() {
         }
         receiptUploadLoading={receiptUploadLoading}
         receiptUploadDisabled={!supabase || !isSignedIn}
-        reimbursementContent={
-          <ReimbursementForm
-            isSignedIn={isSignedIn}
-            prefillSeed={receiptPrefillSeed}
-            onClearPrefillSeed={() => setReceiptPrefillSeed(null)}
-          />
-        }
       />
 
       {supabase ? (
