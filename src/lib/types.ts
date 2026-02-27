@@ -70,3 +70,46 @@ export type DashboardData = {
     utilizationPct: number;
   }>;
 };
+
+export type OwnerStatementTrip = {
+  tripId: string;
+  vehicle: string;
+  renter: string;
+  tripStart: Date;
+  tripEnd: Date;
+  days: number;
+  grossRevenue: number;
+  turoFees: number;
+  managementFees: number;
+  netToOwner: number;
+};
+
+export type OwnerStatementExpense = {
+  id: string;
+  description: string;
+  date: string;
+  amount: number;
+};
+
+export type OwnerStatement = {
+  ownerName: string;
+  month: string;
+  monthLabel: string;
+  statementDate: string;
+  trips: OwnerStatementTrip[];
+  expenses: OwnerStatementExpense[];
+  totalGrossRevenue: number;
+  totalTuroFees: number;
+  totalManagementFees: number;
+  totalExpenses: number;
+  totalBalanceDueOwner: number;
+};
+
+export type CompanySettings = {
+  companyName: string;
+  street: string;
+  cityStateZip: string;
+  phone?: string;
+  email?: string;
+  logoText?: string;
+};

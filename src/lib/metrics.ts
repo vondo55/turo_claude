@@ -1,4 +1,4 @@
-import type { DashboardData, TuroTripRecord } from './types';
+import type { DashboardData, OwnerStatement, OwnerStatementExpense, OwnerStatementTrip, TuroTripRecord } from './types';
 
 const LABOR_HOURS_PER_BOOKING = 2;
 const LABOR_RATE_PER_HOUR = 15;
@@ -196,5 +196,46 @@ export function buildDashboardData(records: TuroTripRecord[]): DashboardData {
     monthlySplit,
     vehicleBreakdown,
     vehiclePerformance,
+  };
+}
+
+export function buildOwnerStatements(
+  records: TuroTripRecord[],
+  displayMonthLabel: string,
+  month: string,
+  expenses: OwnerStatementExpense[]
+): OwnerStatement {
+  const trips: OwnerStatementTrip[] = records
+    .map((r) => ({
+      tripId: String(r.rowNumber),
+      vehicle: r.vehicleName,
+      renter: r.guestName,
+      tripStart: r.tripStart,
+      tripEnd: r.tripEnd,
+      days: dayDiff(r.tripStart, r.tripEnd),
+      grossRevenue: roundCurrency(r.grossRevenue),
+      turoFees: roundCurrency(r.netEarnings !== null ? r.grossRevenue - r.netEarnings : 0),
+      managementFees: roundCurrency(r.lrShare),
+      netToOwner: roundCurrency(r.ownerShare),
+    }))
+    .sort((a, b) => a.tripStart.getTime() - b.tripStart.getTime());
+
+  const totalGrossRevenue = roundCurrency(trips.reduce((s, t) => s + t.grossRevenue, 0));
+  const totalTuroFees = roundCurrency(trips.reduce((s, t) => s + t.turoFees, 0));
+  const totalManagementFees = roundCurrency(trips.reduce((s, t) => s + t.managementFees, 0));
+  const totalExpenses = roundCurrency(expenses.reduce((s, e) => s + e.amount, 0));
+
+  return {
+    ownerName: records[0]?.ownerName ?? '',
+    month,
+    monthLabel: displayMonthLabel,
+    statementDate: new Date().toISOString().slice(0, 10),
+    trips,
+    expenses,
+    totalGrossRevenue,
+    totalTuroFees,
+    totalManagementFees,
+    totalExpenses,
+    totalBalanceDueOwner: roundCurrency(totalGrossRevenue - totalTuroFees - totalManagementFees - totalExpenses),
   };
 }

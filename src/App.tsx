@@ -4,6 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import CopilotDrawer from './components/CopilotDrawer';
 import Dashboard from './components/Dashboard';
 import MultiSelectFilter from './components/MultiSelectFilter';
+import OwnerStatements from './components/OwnerStatements';
 import ReimbursementForm, { type ReceiptPrefillSeed } from './components/ReimbursementForm';
 import UploadZone from './components/UploadZone';
 import { answerWithLocalCopilot, buildCopilotContext, hasMutationIntent, type CopilotAction, type CopilotMessage } from './lib/copilot';
@@ -24,6 +25,7 @@ import type { DashboardData, TuroTripRecord } from './lib/types';
 import type { UploadHistoryItem } from './lib/supabase';
 
 type AnalysisMode = 'ops' | 'accounting';
+type AppView = 'dashboard' | 'statements';
 
 type ReceiptInference = {
   inferredDate: string | null;
@@ -294,6 +296,7 @@ export default function App() {
   const [selectedOwners, setSelectedOwners] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('ops');
+  const [appView, setAppView] = useState<AppView>('dashboard');
   const [dataSource, setDataSource] = useState<'currentUpload' | 'supabaseHistory'>('currentUpload');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -920,6 +923,25 @@ export default function App() {
         </section>
       ) : null}
 
+      {records.length > 0 && (
+        <div className="app-nav-tabs">
+          <button
+            type="button"
+            className={appView === 'dashboard' ? 'tab-button active' : 'tab-button'}
+            onClick={() => setAppView('dashboard')}
+          >
+            Dashboard
+          </button>
+          <button
+            type="button"
+            className={appView === 'statements' ? 'tab-button active' : 'tab-button'}
+            onClick={() => setAppView('statements')}
+          >
+            Statements
+          </button>
+        </div>
+      )}
+
       {dataSource === 'supabaseHistory' ? (
         <section className="history-panel">
           <div className="history-header">
@@ -994,7 +1016,7 @@ export default function App() {
         </section>
       ) : null}
 
-      {dataSource === 'currentUpload' && records.length > 0 ? (
+      {appView === 'dashboard' && dataSource === 'currentUpload' && records.length > 0 ? (
         <section className="filter-controls">
           <label>
             <input
@@ -1058,16 +1080,24 @@ export default function App() {
         </section>
       ) : null}
 
-      {dataSource === 'currentUpload' && data ? (
+      {appView === 'dashboard' && dataSource === 'currentUpload' && data ? (
         <Dashboard
           data={data}
           revenueSeries={revenueSeries}
           revenueTitle={revenueTitle}
           sharePolicyLabel={sharePolicyLabel}
         />
-      ) : dataSource === 'currentUpload' && records.length > 0 ? (
+      ) : appView === 'dashboard' && dataSource === 'currentUpload' && records.length > 0 ? (
         <p className="status">No rows match current filters.</p>
       ) : null}
+
+      {appView === 'statements' && (
+        <OwnerStatements
+          records={modeRecords}
+          isSignedIn={isSignedIn}
+          session={session}
+        />
+      )}
     </main>
   );
 }
