@@ -20,6 +20,9 @@ type ColumnMap = {
   guestLastName?: string;
   status?: string;
   isCancelled?: string;
+  odometerStart?: string;
+  odometerEnd?: string;
+  channel?: string;
   splitItemColumns: Partial<Record<string, string>>;
 };
 
@@ -103,6 +106,9 @@ const recordSchema = z.object({
   legacyOwnerShare: z.number().finite(),
   isCancelled: z.boolean(),
   status: z.string().nullable(),
+  odometerStart: z.number().finite().nullable(),
+  odometerEnd: z.number().finite().nullable(),
+  channel: z.string().nullable(),
 });
 
 const aliases = {
@@ -131,6 +137,19 @@ const aliases = {
   guestLastName: ['guestlastname', 'renterlastname', 'customerlastname', 'guestlast'],
   status: ['tripstatus', 'status', 'reservationstatus'],
   isCancelled: ['cancelled', 'iscancelled', 'canceled', 'iscanceled'],
+  odometerStart: [
+    'odometerstart', 'odostart', 'startodometer', 'mileagestart', 'startmileage',
+    'beginodometer', 'startodo', 'pickupodometer', 'odometeratpickup', 'odometerout',
+    'startingodometer', 'odometerpickup', 'milesout', 'startmiles',
+    'odometerstartreading', 'initialodometer', 'openingodometer',
+  ],
+  odometerEnd: [
+    'odometerend', 'odoend', 'endodometer', 'mileageend', 'endmileage',
+    'finalodometer', 'endodo', 'returnodometer', 'odometeratreturn', 'odometerin',
+    'endingodometer', 'odometerreturn', 'milesin', 'endmiles',
+    'odometerendreading', 'closingodometer', 'finalreading',
+  ],
+  channel: ['channel', 'source', 'bookingsource', 'rentalchannel', 'bookingchannel'],
 };
 
 function normalizeHeader(header: string): string {
@@ -179,6 +198,9 @@ function buildColumnMap(headers: string[]): ColumnMap {
     guestLastName: findColumn(headers, aliases.guestLastName),
     status: findColumn(headers, aliases.status),
     isCancelled: findColumn(headers, aliases.isCancelled),
+    odometerStart: findColumn(headers, aliases.odometerStart),
+    odometerEnd: findColumn(headers, aliases.odometerEnd),
+    channel: findColumn(headers, aliases.channel),
     splitItemColumns: buildSplitItemColumns(headers),
   };
 }
@@ -406,6 +428,9 @@ function parseRow(
     legacyOwnerShare: legacyOwnerShareCents / 100,
     isCancelled: parseCancelled(raw, map),
     status: map.status ? String(raw[map.status] ?? '').trim() || null : null,
+    odometerStart: map.odometerStart ? parseMoney(raw[map.odometerStart]) : null,
+    odometerEnd: map.odometerEnd ? parseMoney(raw[map.odometerEnd]) : null,
+    channel: map.channel ? String(raw[map.channel] ?? '').trim() || null : null,
   };
 
   return recordSchema.parse(candidate);

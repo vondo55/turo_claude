@@ -210,7 +210,11 @@ export function buildOwnerStatements(
       const grossRevenue = roundCurrency(r.grossRevenue);
       const turoFees = roundCurrency(r.netEarnings !== null ? r.grossRevenue - r.netEarnings : 0);
       const managementFees = roundCurrency(r.grossRevenue * 0.30);
-      const netToOwner = roundCurrency(grossRevenue - turoFees - managementFees);
+      const netToOwner = roundCurrency(grossRevenue - managementFees);
+      const miles =
+        r.odometerEnd !== null && r.odometerStart !== null
+          ? Math.max(0, r.odometerEnd - r.odometerStart)
+          : 0;
       return {
         tripId: String(r.rowNumber),
         vehicle: r.vehicleName,
@@ -222,6 +226,8 @@ export function buildOwnerStatements(
         turoFees,
         managementFees,
         netToOwner,
+        miles,
+        channel: r.channel ?? null,
       };
     })
     .sort((a, b) => a.tripStart.getTime() - b.tripStart.getTime());
@@ -230,6 +236,18 @@ export function buildOwnerStatements(
   const totalTuroFees = roundCurrency(trips.reduce((s, t) => s + t.turoFees, 0));
   const totalManagementFees = roundCurrency(trips.reduce((s, t) => s + t.managementFees, 0));
   const totalExpenses = roundCurrency(expenses.reduce((s, e) => s + e.amount, 0));
+  // Period-level odometer delta: last trip's odometerEnd minus first trip's odometerStart
+  const recordsWithOdometer = records
+    .filter((r) => r.odometerStart !== null && r.odometerEnd !== null)
+    .sort((a, b) => a.tripStart.getTime() - b.tripStart.getTime());
+  const totalMilesDriven =
+    recordsWithOdometer.length > 0
+      ? Math.max(
+          0,
+          (recordsWithOdometer[recordsWithOdometer.length - 1].odometerEnd ?? 0) -
+            (recordsWithOdometer[0].odometerStart ?? 0),
+        )
+      : 0;
 
   return {
     ownerName: records[0]?.ownerName ?? '',
@@ -242,6 +260,7 @@ export function buildOwnerStatements(
     totalTuroFees,
     totalManagementFees,
     totalExpenses,
-    totalBalanceDueOwner: roundCurrency(totalGrossRevenue - totalTuroFees - totalManagementFees - totalExpenses),
+    totalBalanceDueOwner: roundCurrency(totalGrossRevenue - totalManagementFees - totalExpenses),
+    totalMilesDriven,
   };
 }

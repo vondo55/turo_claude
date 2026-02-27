@@ -14,6 +14,9 @@ export type TuroTripRecord = {
   legacyOwnerShare: number;
   isCancelled: boolean;
   status: string | null;
+  odometerStart: number | null;
+  odometerEnd: number | null;
+  channel: string | null;
 };
 
 export type ParseResult = {
@@ -82,6 +85,8 @@ export type OwnerStatementTrip = {
   turoFees: number;
   managementFees: number;
   netToOwner: number;
+  miles: number;
+  channel: string | null;
 };
 
 export type OwnerStatementExpense = {
@@ -103,6 +108,7 @@ export type OwnerStatement = {
   totalManagementFees: number;
   totalExpenses: number;
   totalBalanceDueOwner: number;
+  totalMilesDriven: number;
 };
 
 export type CompanySettings = {

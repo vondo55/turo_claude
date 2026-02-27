@@ -1685,6 +1685,30 @@ tfoot th {
   }
 }
 
+/* ── KPI row labels ("Revenue Efficiency", "Utilization & Wear") */
+.kpi-row-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #829ab1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0.75rem 0 0.3rem;
+  padding: 0;
+}
+
+.kpi-row-label:first-of-type {
+  margin-top: 0.1rem;
+}
+
+/* Optional metric row renders slightly smaller */
+.kpi-snapshot-grid-optional {
+  margin-top: 0.6rem;
+}
+
+.kpi-snapshot-grid-optional .kpi-snapshot-value {
+  font-size: 1.1rem;
+}
+
 /* ── Responsive: 2-col KPI grid on narrow screens ─────────── */
 @media (max-width: 580px) {
   .kpi-snapshot-grid {
