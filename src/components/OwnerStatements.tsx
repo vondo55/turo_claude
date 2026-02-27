@@ -6,11 +6,6 @@ import type { CompanySettings, OwnerStatement, OwnerStatementExpense, TuroTripRe
 import CompanySettingsModal, { loadCompanySettings, saveCompanySettings } from './CompanySettingsModal';
 import OwnerStatementDocument from './OwnerStatementDocument';
 
-const MOCK_EXPENSES: OwnerStatementExpense[] = [
-  { id: 'mock-1', description: 'Tire Repair at Lamb\'s Autobody', date: '2025-01-08', amount: 95.0 },
-  { id: 'mock-2', description: 'Oil Change', date: '2025-01-15', amount: 64.99 },
-];
-
 function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
@@ -93,8 +88,13 @@ export default function OwnerStatements({ records, isSignedIn }: OwnerStatements
           setExpensesLoading(false);
         });
     } else {
-      // Use mock data when not signed in; filter to selected month
-      setExpenses(MOCK_EXPENSES.filter((e) => e.date.startsWith(selectedMonth)));
+      // Use mock data when not signed in; set dates to match selected month
+      const [year, mon] = selectedMonth.split('-');
+      const mockWithDates: OwnerStatementExpense[] = [
+        { id: 'mock-1', description: "Tire Repair at Lamb's Autobody", date: `${year}-${mon}-08`, amount: 95.0 },
+        { id: 'mock-2', description: 'Oil Change', date: `${year}-${mon}-15`, amount: 64.99 },
+      ];
+      setExpenses(mockWithDates);
       setExpensesLoading(false);
     }
   }, [selectedMonth, isSignedIn]);

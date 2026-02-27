@@ -151,7 +151,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
                   <tr key={exp.id} className={index % 2 === 0 ? 'row-even' : 'row-odd'}>
                     <td className="col-muted">{exp.id}</td>
                     <td>{exp.description}</td>
-                    <td>{exp.date}</td>
+                    <td>{formatDate(exp.date)}</td>
                     <td className="col-currency col-deduction">{fmtCurrency(exp.amount)}</td>
                   </tr>
                 ))}
