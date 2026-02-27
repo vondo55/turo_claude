@@ -109,14 +109,20 @@ export default function OwnerStatements({ records, isSignedIn }: OwnerStatements
 
     const label = monthLabelFromKey(selectedMonth);
 
-    // Group expenses by owner extracted from vehicle string
+    // Determine if expenses are unlinked mock data (no _ownerFromVehicle on any entry)
+    const allUnlinked = expenses.every(
+      (exp) => !((exp as OwnerStatementExpense & { _ownerFromVehicle?: string })._ownerFromVehicle)
+    );
+
+    // Group expenses by owner extracted from vehicle string (Supabase path only)
     const expensesByOwner = new Map<string, OwnerStatementExpense[]>();
-    for (const exp of expenses) {
-      // _ownerFromVehicle is injected in the Supabase path; fallback to empty
-      const ownerKey = (exp as OwnerStatementExpense & { _ownerFromVehicle?: string })._ownerFromVehicle ?? '';
-      const list = expensesByOwner.get(ownerKey) ?? [];
-      list.push(exp);
-      expensesByOwner.set(ownerKey, list);
+    if (!allUnlinked) {
+      for (const exp of expenses) {
+        const ownerKey = (exp as OwnerStatementExpense & { _ownerFromVehicle?: string })._ownerFromVehicle ?? '';
+        const list = expensesByOwner.get(ownerKey) ?? [];
+        list.push(exp);
+        expensesByOwner.set(ownerKey, list);
+      }
     }
 
     // Group trip records by owner
@@ -130,7 +136,8 @@ export default function OwnerStatements({ records, isSignedIn }: OwnerStatements
     // Build one statement per owner
     const result: OwnerStatement[] = [];
     for (const [ownerName, ownerRecords] of recordsByOwner.entries()) {
-      const ownerExpenses = expensesByOwner.get(ownerName) ?? [];
+      // Mock (unlinked) expenses show on every owner; Supabase expenses filtered by owner
+      const ownerExpenses = allUnlinked ? expenses : (expensesByOwner.get(ownerName) ?? []);
       result.push(buildOwnerStatements(ownerRecords, label, selectedMonth, ownerExpenses));
     }
 

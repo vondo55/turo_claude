@@ -3,12 +3,14 @@ import type { Session } from '@supabase/supabase-js';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import CopilotDrawer from './components/CopilotDrawer';
 import Dashboard from './components/Dashboard';
+import FeeSettingsPanel from './components/FeeSettingsPanel';
 import MultiSelectFilter from './components/MultiSelectFilter';
 import OwnerStatements from './components/OwnerStatements';
 import ReimbursementForm, { type ReceiptPrefillSeed } from './components/ReimbursementForm';
 import UploadZone from './components/UploadZone';
 import { answerWithLocalCopilot, buildCopilotContext, hasMutationIntent, type CopilotAction, type CopilotMessage } from './lib/copilot';
 import { parseTuroCsv } from './lib/csv';
+import { loadFeeSettings, saveFeeSettings, toSplitRatios, type FeeSettings } from './lib/feeSettings';
 import { buildDashboardData } from './lib/metrics';
 import {
   getHistoricalRevenueSeries,
@@ -25,7 +27,7 @@ import type { DashboardData, TuroTripRecord } from './lib/types';
 import type { UploadHistoryItem } from './lib/supabase';
 
 type AnalysisMode = 'ops' | 'accounting';
-type AppView = 'dashboard' | 'statements';
+type AppView = 'dashboard' | 'statements' | 'settings';
 
 type ReceiptInference = {
   inferredDate: string | null;
@@ -308,6 +310,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [feeSettings, setFeeSettings] = useState<FeeSettings>(() => loadFeeSettings());
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copilotInput, setCopilotInput] = useState('');
   const [copilotLoading, setCopilotLoading] = useState(false);
@@ -558,7 +561,7 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      const parsed = await parseTuroCsv(file);
+      const parsed = await parseTuroCsv(file, toSplitRatios(feeSettings));
       setRecords(parsed.records);
       setSelectedMonth('all');
       setSelectedOwners([]);
@@ -923,24 +926,33 @@ export default function App() {
         </section>
       ) : null}
 
-      {records.length > 0 && (
-        <div className="app-nav-tabs">
-          <button
-            type="button"
-            className={appView === 'dashboard' ? 'tab-button active' : 'tab-button'}
-            onClick={() => setAppView('dashboard')}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className={appView === 'statements' ? 'tab-button active' : 'tab-button'}
-            onClick={() => setAppView('statements')}
-          >
-            Statements
-          </button>
-        </div>
-      )}
+      <div className="app-nav-tabs">
+        {records.length > 0 && (
+          <>
+            <button
+              type="button"
+              className={appView === 'dashboard' ? 'tab-button active' : 'tab-button'}
+              onClick={() => setAppView('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              className={appView === 'statements' ? 'tab-button active' : 'tab-button'}
+              onClick={() => setAppView('statements')}
+            >
+              Statements
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          className={appView === 'settings' ? 'tab-button active' : 'tab-button'}
+          onClick={() => setAppView('settings')}
+        >
+          ⚙ Fee Settings
+        </button>
+      </div>
 
       {dataSource === 'supabaseHistory' ? (
         <section className="history-panel">
@@ -1096,6 +1108,16 @@ export default function App() {
           records={modeRecords}
           isSignedIn={isSignedIn}
           session={session}
+        />
+      )}
+
+      {appView === 'settings' && (
+        <FeeSettingsPanel
+          settings={feeSettings}
+          onSettingsChange={(next) => {
+            setFeeSettings(next);
+            saveFeeSettings(next);
+          }}
         />
       )}
     </main>

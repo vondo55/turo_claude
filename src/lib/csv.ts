@@ -343,7 +343,12 @@ function extractOwnerFromVehicleColumns(rawVehicle: string, cleanVehicle: string
   return null;
 }
 
-function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecord {
+function parseRow(
+  raw: RawRow,
+  rowNumber: number,
+  map: ColumnMap,
+  customSplitRatios?: Record<string, { lrBps: number; ownerBps: number }>
+): TuroTripRecord {
   const start = parseDate(raw[map.tripStart]);
   const end = parseDate(raw[map.tripEnd]);
   const gross = parseMoney(raw[map.grossRevenue]);
@@ -352,7 +357,8 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
     throw new Error(`Row ${rowNumber}: invalid date or revenue format.`);
   }
 
-  const { lrShareCents, ownerShareCents } = computeSplitSharesCents(raw, map, currentSplitRatios);
+  const splitRatios = customSplitRatios ?? currentSplitRatios;
+  const { lrShareCents, ownerShareCents } = computeSplitSharesCents(raw, map, splitRatios);
   const { lrShareCents: legacyLrShareCents, ownerShareCents: legacyOwnerShareCents } = computeSplitSharesCents(
     raw,
     map,
@@ -405,7 +411,10 @@ function parseRow(raw: RawRow, rowNumber: number, map: ColumnMap): TuroTripRecor
   return recordSchema.parse(candidate);
 }
 
-export async function parseTuroCsv(file: File): Promise<ParseResult> {
+export async function parseTuroCsv(
+  file: File,
+  customSplitRatios?: Record<string, { lrBps: number; ownerBps: number }>
+): Promise<ParseResult> {
   const parsed = await new Promise<Papa.ParseResult<RawRow>>((resolve, reject) => {
     Papa.parse<RawRow>(file, {
       header: true,
@@ -426,7 +435,7 @@ export async function parseTuroCsv(file: File): Promise<ParseResult> {
   parsed.data.forEach((raw, idx) => {
     const rowNumber = idx + 2;
     try {
-      records.push(parseRow(raw, rowNumber, map));
+      records.push(parseRow(raw, rowNumber, map, customSplitRatios));
     } catch (error) {
       warnings.push(error instanceof Error ? error.message : `Row ${rowNumber}: skipped due to parse error.`);
     }

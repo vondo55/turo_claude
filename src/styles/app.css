@@ -1459,3 +1459,498 @@ tfoot th {
     gap: 0.3rem;
   }
 }
+
+/* ============================================================
+   OWNER STATEMENT — PERFORMANCE LAYOUT (v2)
+   ============================================================ */
+
+/* ── 1. Performance Snapshot KPI grid ────────────────────── */
+.kpi-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+.kpi-snapshot-tile {
+  background: #f7fbf9;
+  border: 1px solid #cfe8dc;
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.kpi-snapshot-accent {
+  background: #0b6e4f;
+  border-color: #085c41;
+}
+
+.kpi-snapshot-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #102a43;
+  font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.kpi-snapshot-value-accent {
+  color: #fff;
+  font-size: 1.5rem;
+}
+
+.kpi-snapshot-label {
+  font-size: 0.68rem;
+  color: #627d98;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+}
+
+.kpi-snapshot-accent .kpi-snapshot-label {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* ── 2. Fleet Activity compact row ───────────────────────── */
+.statement-section-compact {
+  margin-bottom: 1.1rem;
+}
+
+.fleet-metrics-row {
+  display: flex;
+  border: 1px solid #cfe8dc;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.fleet-metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.65rem 0.8rem;
+  border-right: 1px solid #dde9e4;
+  gap: 0.15rem;
+}
+
+.fleet-metric:last-child {
+  border-right: none;
+}
+
+.fleet-metric-value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #102a43;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.fleet-metric-label {
+  font-size: 0.67rem;
+  color: #829ab1;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+/* ── Trip table vehicle column ───────────────────────────── */
+.col-vehicle {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 5. Earnings Summary box ─────────────────────────────── */
+.earnings-summary-box {
+  border: 1px solid #d9e2ec;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.earnings-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.44rem 0.9rem;
+  font-size: 0.88rem;
+  border-bottom: 1px solid #eef2f7;
+  color: #334e68;
+}
+
+.earnings-line:last-child {
+  border-bottom: none;
+}
+
+.earnings-amount {
+  font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.earnings-deduction .earnings-amount {
+  color: #7b3a3a;
+}
+
+.earnings-separator {
+  height: 2px;
+  background: #e4edf5;
+  border: none;
+  margin: 0;
+}
+
+.earnings-net-line {
+  background: #f7fbf9;
+  font-weight: 700;
+  color: #102a43;
+}
+
+.earnings-net-amount {
+  color: #0b6e4f;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* ── Print overrides for v2 layout ───────────────────────── */
+@media print {
+  .kpi-snapshot-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.35rem;
+  }
+
+  .kpi-snapshot-tile {
+    break-inside: avoid;
+    padding: 0.5rem 0.65rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .kpi-snapshot-accent {
+    background: #0b6e4f !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .kpi-snapshot-value {
+    font-size: 1.05rem;
+  }
+
+  .kpi-snapshot-value-accent {
+    font-size: 1.2rem;
+    color: #fff !important;
+  }
+
+  .kpi-snapshot-label {
+    font-size: 0.62rem;
+  }
+
+  .kpi-snapshot-accent .kpi-snapshot-label {
+    color: rgba(255, 255, 255, 0.75) !important;
+  }
+
+  .fleet-metrics-row {
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .statement-table {
+    break-inside: auto;
+    font-size: 0.75rem;
+  }
+
+  /* Repeat table header on page 2 for long trip lists */
+  .statement-table thead {
+    display: table-header-group;
+  }
+
+  .statement-table tr {
+    break-inside: avoid;
+  }
+
+  .earnings-summary-box {
+    break-inside: avoid;
+  }
+
+  .earnings-net-line {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* ── Responsive: 2-col KPI grid on narrow screens ─────────── */
+@media (max-width: 580px) {
+  .kpi-snapshot-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .fleet-metrics-row {
+    flex-wrap: wrap;
+  }
+
+  .fleet-metric {
+    flex: 1 1 45%;
+    border-bottom: 1px solid #dde9e4;
+  }
+
+  .fleet-metric:nth-last-child(-n+2):not(:nth-child(odd)) {
+    border-bottom: none;
+  }
+}
+
+/* ============================================================
+   FEE SETTINGS PANEL
+   ============================================================ */
+
+.fee-settings-panel {
+  max-width: 960px;
+  margin: 2rem auto;
+  padding: 0 1rem 4rem;
+}
+
+.fee-settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.fee-settings-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #0b6e4f;
+  margin: 0 0 0.35rem;
+}
+
+.fee-settings-subtitle {
+  font-size: 0.875rem;
+  color: #334e68;
+  margin: 0;
+  max-width: 520px;
+  line-height: 1.5;
+}
+
+.fee-settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.fee-dirty-badge {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+  border-radius: 12px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fee-save-banner {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+/* Sections */
+.fee-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.fee-section {
+  background: #fff;
+  border: 1px solid #dde6ed;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.fee-section-heading {
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid #eef2f6;
+  background: #f7fbf9;
+}
+
+.fee-section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0b6e4f;
+  margin: 0 0 0.15rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fee-section-desc {
+  font-size: 0.78rem;
+  color: #627d98;
+  margin: 0;
+}
+
+/* Fee Table */
+.fee-table-scroll {
+  overflow-x: auto;
+}
+
+.fee-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.fee-table thead tr {
+  background: #f0f4f8;
+}
+
+.fee-table th {
+  padding: 0.55rem 0.9rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #486581;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #dde6ed;
+}
+
+.fee-table td {
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid #eef2f6;
+  color: #243b53;
+  vertical-align: middle;
+}
+
+.fee-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.fee-table tbody tr:hover {
+  background: #f7fbf9;
+}
+
+/* Dirty (modified) row */
+.fee-row-dirty {
+  background: #fffde7 !important;
+}
+
+.fee-row-dirty td {
+  color: #5a3e00;
+}
+
+/* Column widths */
+.fee-col-item {
+  min-width: 180px;
+  font-weight: 500;
+}
+
+.fee-col-pct {
+  width: 120px;
+  text-align: center;
+}
+
+.fee-col-default {
+  width: 140px;
+  text-align: center;
+}
+
+/* Owner % input */
+.fee-pct-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: #fff;
+  border: 1.5px solid #c5d5e4;
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  transition: border-color 0.15s;
+}
+
+.fee-pct-input-wrap:focus-within {
+  border-color: #0b6e4f;
+  box-shadow: 0 0 0 3px rgba(11, 110, 79, 0.12);
+}
+
+.fee-pct-input {
+  width: 48px;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #102a43;
+  background: transparent;
+  text-align: right;
+  /* remove number spinner */
+  -moz-appearance: textfield;
+}
+
+.fee-pct-input::-webkit-outer-spin-button,
+.fee-pct-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.fee-pct-symbol {
+  font-size: 0.8rem;
+  color: #627d98;
+  font-weight: 600;
+}
+
+/* Host % display */
+.fee-host-pct {
+  color: #627d98;
+  font-weight: 500;
+}
+
+/* Default % display */
+.fee-default-pct {
+  color: #9fb3c8;
+  font-size: 0.825rem;
+}
+
+/* Footer */
+.fee-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #dde6ed;
+}
+
+/* Make Settings tab always visible even without data */
+.app-nav-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #dde6ed;
+  margin-bottom: 0;
+}
+
+@media (max-width: 600px) {
+  .fee-settings-header {
+    flex-direction: column;
+  }
+
+  .fee-settings-header-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .fee-col-default {
+    display: none;
+  }
+}

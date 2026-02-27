@@ -206,18 +206,24 @@ export function buildOwnerStatements(
   expenses: OwnerStatementExpense[]
 ): OwnerStatement {
   const trips: OwnerStatementTrip[] = records
-    .map((r) => ({
-      tripId: String(r.rowNumber),
-      vehicle: r.vehicleName,
-      renter: r.guestName,
-      tripStart: r.tripStart,
-      tripEnd: r.tripEnd,
-      days: dayDiff(r.tripStart, r.tripEnd),
-      grossRevenue: roundCurrency(r.grossRevenue),
-      turoFees: roundCurrency(r.netEarnings !== null ? r.grossRevenue - r.netEarnings : 0),
-      managementFees: roundCurrency(r.lrShare),
-      netToOwner: roundCurrency(r.ownerShare),
-    }))
+    .map((r) => {
+      const grossRevenue = roundCurrency(r.grossRevenue);
+      const turoFees = roundCurrency(r.netEarnings !== null ? r.grossRevenue - r.netEarnings : 0);
+      const managementFees = roundCurrency(r.grossRevenue * 0.30);
+      const netToOwner = roundCurrency(grossRevenue - turoFees - managementFees);
+      return {
+        tripId: String(r.rowNumber),
+        vehicle: r.vehicleName,
+        renter: r.guestName,
+        tripStart: r.tripStart,
+        tripEnd: r.tripEnd,
+        days: dayDiff(r.tripStart, r.tripEnd),
+        grossRevenue,
+        turoFees,
+        managementFees,
+        netToOwner,
+      };
+    })
     .sort((a, b) => a.tripStart.getTime() - b.tripStart.getTime());
 
   const totalGrossRevenue = roundCurrency(trips.reduce((s, t) => s + t.grossRevenue, 0));
