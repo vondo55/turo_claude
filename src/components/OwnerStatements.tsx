@@ -76,6 +76,7 @@ export default function OwnerStatements({ records, isSignedIn }: OwnerStatements
                 description: String(row.description ?? ''),
                 date: String(row.expense_date ?? ''),
                 amount: Number(row.amount ?? 0),
+                vehicle: typeof row.vehicle === 'string' ? row.vehicle.trim() || undefined : undefined,
                 // Store owner info extracted from vehicle string for grouping
                 _ownerFromVehicle: (() => {
                   if (typeof row.vehicle !== 'string') return '';

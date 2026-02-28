@@ -43,15 +43,9 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
   const avgDailyRate = totalRentalDays > 0 ? statement.totalGrossRevenue / totalRentalDays : 0;
   const avgTripLength = statement.trips.length > 0 ? totalRentalDays / statement.trips.length : 0;
 
-  // Per-mile & ratio metrics (only meaningful when miles data exists)
-  const grossPerMile =
-    totalMilesDriven > 0 ? statement.totalGrossRevenue / totalMilesDriven : null;
+  // Per-mile metric (only meaningful when miles data exists)
   const netPerMile =
     totalMilesDriven > 0 ? statement.totalBalanceDueOwner / totalMilesDriven : null;
-  const maintenanceRatioPct =
-    statement.totalGrossRevenue > 0 && statement.totalExpenses > 0
-      ? (statement.totalExpenses / statement.totalGrossRevenue) * 100
-      : null;
 
   // Net from trip activity before expenses (trip table tfoot)
   const netBeforeExpenses =
@@ -94,10 +88,6 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
             <span className="statement-meta-label">Statement Period</span>
             <span className="statement-meta-value">{statement.monthLabel}</span>
           </div>
-          <div className="statement-meta-row">
-            <span className="statement-meta-label">Trip Count</span>
-            <span className="statement-meta-value">{statement.trips.length}</span>
-          </div>
         </div>
       </div>
 
@@ -114,12 +104,6 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
           </div>
           <div className="kpi-snapshot-tile">
             <span className="kpi-snapshot-value">
-              {grossPerMile !== null ? fmtCurrency(grossPerMile) : '—'}
-            </span>
-            <span className="kpi-snapshot-label">Gross Revenue / Mile</span>
-          </div>
-          <div className="kpi-snapshot-tile">
-            <span className="kpi-snapshot-value">
               {totalRentalDays > 0 ? fmtCurrency(avgDailyRate) : '—'}
             </span>
             <span className="kpi-snapshot-label">Avg Daily Rate</span>
@@ -127,7 +111,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
         </div>
 
         {/* Row 2 — Utilization & Wear */}
-        <p className="kpi-row-label">Utilization &amp; Wear</p>
+        <p className="kpi-row-label">Utilization</p>
         <div className="kpi-snapshot-grid">
           <div className="kpi-snapshot-tile">
             <span className="kpi-snapshot-value">
@@ -145,6 +129,12 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
           </div>
           <div className="kpi-snapshot-tile">
             <span className="kpi-snapshot-value">
+              {statement.trips.length > 0 ? avgTripLength.toFixed(1) : '—'}
+            </span>
+            <span className="kpi-snapshot-label">Avg Trip Days</span>
+          </div>
+          <div className="kpi-snapshot-tile">
+            <span className="kpi-snapshot-value">
               {totalMilesDriven > 0 ? totalMilesDriven.toLocaleString() : '—'}
             </span>
             <span className="kpi-snapshot-label">Total Miles Driven</span>
@@ -152,44 +142,17 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
         </div>
 
         {/* Optional Row — only rendered when per-mile data or expense ratio is available */}
-        {(netPerMile !== null || maintenanceRatioPct !== null) && (
-          <div className={`kpi-snapshot-grid kpi-snapshot-grid-optional`}>
-            {netPerMile !== null && (
-              <div className="kpi-snapshot-tile">
-                <span className="kpi-snapshot-value">{fmtCurrency(netPerMile)}</span>
-                <span className="kpi-snapshot-label">Net Revenue / Mile</span>
-              </div>
-            )}
-            {maintenanceRatioPct !== null && (
-              <div className="kpi-snapshot-tile">
-                <span className="kpi-snapshot-value">{fmtPct(maintenanceRatioPct)}</span>
-                <span className="kpi-snapshot-label">Maintenance Ratio</span>
-              </div>
-            )}
+        {netPerMile !== null && (
+          <div className="kpi-snapshot-grid kpi-snapshot-grid-optional">
+            <div className="kpi-snapshot-tile">
+              <span className="kpi-snapshot-value">{fmtCurrency(netPerMile)}</span>
+              <span className="kpi-snapshot-label">Net Revenue / Mile</span>
+            </div>
           </div>
         )}
       </section>
 
-      {/* ── 2. Fleet Activity (compact) ─────────────────────────────────── */}
-      {statement.trips.length > 0 && (
-        <section className="statement-section statement-section-compact">
-          <h2 className="statement-section-title">Fleet Activity</h2>
-          <div className="fleet-metrics-row">
-            <div className="fleet-metric">
-              <span className="fleet-metric-value">{statement.trips.length}</span>
-              <span className="fleet-metric-label">Trips</span>
-            </div>
-            {totalRentalDays > 0 && (
-              <div className="fleet-metric">
-                <span className="fleet-metric-value">{avgTripLength.toFixed(1)}</span>
-                <span className="fleet-metric-label">Avg Trip Days</span>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── 3. Trip Detail Table ────────────────────────────────────────── */}
+      {/* ── 2. Trip Detail Table ────────────────────────────────────────── */}
       <section className="statement-section">
         <h2 className="statement-section-title">
           Trip Detail &nbsp;
@@ -205,6 +168,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
                 <tr>
                   <th>Trip Start</th>
                   <th>Trip End</th>
+                  <th>Vehicle</th>
                   <th className="col-center">Days</th>
                   <th className="col-currency">Gross Revenue</th>
                   {hasChannel && <th>Channel</th>}
@@ -217,6 +181,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
                   <tr key={trip.tripId} className={index % 2 === 0 ? 'row-even' : 'row-odd'}>
                     <td style={{ whiteSpace: 'nowrap' }}>{formatDate(trip.tripStart)}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{formatDate(trip.tripEnd)}</td>
+                    <td>{trip.vehicle}</td>
                     <td className="col-center">{trip.days}</td>
                     <td className="col-currency">{fmtCurrency(trip.grossRevenue)}</td>
                     {hasChannel && (
@@ -231,7 +196,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
               </tbody>
               <tfoot>
                 <tr className="statement-totals-row">
-                  <td colSpan={hasChannel ? 3 : 2} className="totals-label">Totals</td>
+                  <td colSpan={hasChannel ? 5 : 4} className="totals-label">Totals</td>
                   <td className="col-currency">{fmtCurrency(statement.totalGrossRevenue)}</td>
                   <td className="col-currency col-deduction">
                     {statement.totalManagementFees > 0 ? fmtNeg(statement.totalManagementFees) : '—'}
@@ -244,10 +209,10 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
         )}
       </section>
 
-      {/* ── 4. Operating Expenses ───────────────────────────────────────── */}
+      {/* ── 4. Vehicle Expenses ─────────────────────────────────────────── */}
       <section className="statement-section">
         <h2 className="statement-section-title">
-          Operating Expenses &nbsp;
+          Vehicle Expenses &nbsp;
           <span className="statement-section-period">{statement.monthLabel}</span>
         </h2>
 
@@ -259,6 +224,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Vehicle</th>
                   <th>Description</th>
                   <th className="col-currency">Amount</th>
                 </tr>
@@ -267,6 +233,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
                 {statement.expenses.map((exp, index) => (
                   <tr key={exp.id} className={index % 2 === 0 ? 'row-even' : 'row-odd'}>
                     <td style={{ whiteSpace: 'nowrap' }}>{formatDate(exp.date)}</td>
+                    <td>{exp.vehicle ?? '—'}</td>
                     <td>{exp.description}</td>
                     <td className="col-currency col-deduction">
                       {exp.amount > 0 ? fmtNeg(exp.amount) : fmtCurrency(exp.amount)}
@@ -276,7 +243,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
               </tbody>
               <tfoot>
                 <tr className="statement-totals-row">
-                  <td colSpan={2} className="totals-label">Total Operating Expenses</td>
+                  <td colSpan={3} className="totals-label">Total Vehicle Expenses</td>
                   <td className="col-currency col-deduction">
                     {statement.totalExpenses > 0 ? fmtNeg(statement.totalExpenses) : '—'}
                   </td>
@@ -303,7 +270,7 @@ export default function OwnerStatementDocument({ statement, company }: OwnerStat
               </span>
             </div>
             <div className="earnings-line earnings-deduction">
-              <span>Less Operating Expenses</span>
+              <span>Less Vehicle Expenses</span>
               <span className="earnings-amount">
                 {statement.totalExpenses > 0 ? fmtNeg(statement.totalExpenses) : '—'}
               </span>

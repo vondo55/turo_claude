@@ -94,6 +94,7 @@ export type OwnerStatementExpense = {
   description: string;
   date: string;
   amount: number;
+  vehicle?: string;
 };
 
 export type OwnerStatement = {

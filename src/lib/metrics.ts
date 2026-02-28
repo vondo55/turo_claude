@@ -236,18 +236,28 @@ export function buildOwnerStatements(
   const totalTuroFees = roundCurrency(trips.reduce((s, t) => s + t.turoFees, 0));
   const totalManagementFees = roundCurrency(trips.reduce((s, t) => s + t.managementFees, 0));
   const totalExpenses = roundCurrency(expenses.reduce((s, e) => s + e.amount, 0));
-  // Period-level odometer delta: last trip's odometerEnd minus first trip's odometerStart
-  const recordsWithOdometer = records
-    .filter((r) => r.odometerStart !== null && r.odometerEnd !== null)
-    .sort((a, b) => a.tripStart.getTime() - b.tripStart.getTime());
-  const totalMilesDriven =
-    recordsWithOdometer.length > 0
-      ? Math.max(
-          0,
-          (recordsWithOdometer[recordsWithOdometer.length - 1].odometerEnd ?? 0) -
-            (recordsWithOdometer[0].odometerStart ?? 0),
-        )
-      : 0;
+  // Per-vehicle odometer span: (earliest odometerStart → latest odometerEnd) per vehicle, summed
+  const vehicleOdometerMap = new Map<string, { minStart: number; maxEnd: number }>();
+  for (const r of records) {
+    if (r.odometerStart !== null && r.odometerEnd !== null) {
+      const current = vehicleOdometerMap.get(r.vehicleName);
+      if (!current) {
+        vehicleOdometerMap.set(r.vehicleName, {
+          minStart: r.odometerStart,
+          maxEnd: r.odometerEnd,
+        });
+      } else {
+        vehicleOdometerMap.set(r.vehicleName, {
+          minStart: Math.min(current.minStart, r.odometerStart),
+          maxEnd: Math.max(current.maxEnd, r.odometerEnd),
+        });
+      }
+    }
+  }
+  const totalMilesDriven = Array.from(vehicleOdometerMap.values()).reduce(
+    (sum, { minStart, maxEnd }) => sum + Math.max(0, maxEnd - minStart),
+    0,
+  );
 
   return {
     ownerName: records[0]?.ownerName ?? '',
